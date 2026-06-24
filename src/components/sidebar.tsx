@@ -16,6 +16,9 @@ import {
   X,
   Plus,
   Boxes,
+  Settings,
+  Truck,
+  Calendar,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -37,9 +40,12 @@ export function Sidebar({ user }: SidebarProps) {
     { href: "/minimarket", label: "Minimarket", icon: Store },
     { href: "/transactions", label: "Transaksi", icon: ArrowLeftRight },
     { href: "/categories", label: "Kategori", icon: Tags },
+    { href: "/suppliers", label: "Supplier/Sales", icon: Truck },
+    { href: "/tempo", label: "Tempo", icon: Calendar },
     { href: "/assets", label: "Aset", icon: Boxes },
     { href: "/reports", label: "Laporan", icon: BarChart3 },
     { href: "/personal", label: "Pribadi", icon: User },
+    { href: "/settings", label: "Pengaturan", icon: Settings },
   ];
 
   const isActive = (href: string) => {

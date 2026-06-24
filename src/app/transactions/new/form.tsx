@@ -18,17 +18,24 @@ interface Category {
   categoryType: string;
 }
 
+interface ExpenseDesc {
+  id: string;
+  name: string;
+}
+
 export function NewTransactionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [expenseDescriptions, setExpenseDescriptions] = useState<ExpenseDesc[]>([]);
   const [businessId, setBusinessId] = useState("");
   const [transactionType, setTransactionType] = useState("expense");
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [transactionDate, setTransactionDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -54,21 +61,24 @@ export function NewTransactionForm() {
 
   useEffect(() => {
     if (businessId) {
-      fetch(`/api/categories?businessId=${businessId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setCategories(data.categories);
-          const filtered = data.categories
-            .filter((c: Category) => c.categoryType === transactionType)
-            .shift();
-          setCategoryId(filtered?.id || "");
-        });
+      Promise.all([
+        fetch(`/api/categories?businessId=${businessId}`).then((r) => r.json()),
+        fetch(`/api/expense-descriptions?businessId=${businessId}`).then((r) => r.json()),
+      ]).then(([catData, descData]) => {
+        setCategories(catData.categories);
+        setExpenseDescriptions(descData.descriptions);
+        const filtered = catData.categories
+          .filter((c: Category) => c.categoryType === transactionType)
+          .shift();
+        setCategoryId(filtered?.id || "");
+      });
     }
   }, [businessId, transactionType]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!businessId || !amount || !description) return;
+    const finalDescription = description === "__custom__" ? customDescription : description;
+    if (!businessId || !amount || !finalDescription) return;
     setLoading(true);
     setError("");
 
@@ -82,7 +92,7 @@ export function NewTransactionForm() {
           transactionType,
           amount: parseFloat(amount),
           transactionDate,
-          description,
+          description: finalDescription,
           notes: notes.trim() || null,
         }),
       });
@@ -211,14 +221,34 @@ export function NewTransactionForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
-          <input
-            type="text"
+          <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi *</label>
+          <select
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (e.target.value !== "__custom__") setCustomDescription("");
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            placeholder="Contoh: Penjualan harian, Beli pupuk, dll"
-          />
+            required
+          >
+            <option value="">Pilih Deskripsi</option>
+            {expenseDescriptions.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+            <option value="__custom__">+ Deskripsi Lainnya (tulis sendiri)</option>
+          </select>
+          {description === "__custom__" && (
+            <input
+              type="text"
+              value={customDescription}
+              onChange={(e) => setCustomDescription(e.target.value)}
+              className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              placeholder="Tulis deskripsi sendiri"
+              required
+            />
+          )}
         </div>
 
         <div>

@@ -23,21 +23,25 @@ model User {
 }
 
 model Business {
-  id           String              @id @default(uuid())
-  ownerId      String
-  name         String
-  slug         String              @unique
-  businessType String              @default("general")
-  description  String?
-  isArchived   Boolean             @default(false)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  id                  String               @id @default(uuid())
+  ownerId             String
+  name                String
+  slug                String               @unique
+  businessType        String               @default("general")
+  description         String?
+  isArchived          Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
-  owner        User                @relation(fields: [ownerId], references: [id])
-  memberships  BusinessMembership[]
-  categories   Category[]
-  transactions Transaction[]
-  assets       Asset[]
+  owner               User                 @relation(fields: [ownerId], references: [id])
+  memberships         BusinessMembership[]
+  categories          Category[]
+  transactions        Transaction[]
+  assets              Asset[]
+  cashiers            Cashier[]
+  expenseDescriptions ExpenseDescription[]
+  suppliers           Supplier[]
+  supplierTempos      SupplierTempo[]
 }
 
 model BusinessMembership {
@@ -128,4 +132,77 @@ model Attachment {
   createdAt     DateTime    @default(now())
 
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+}
+
+model Cashier {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name])
+}
+
+model ExpenseDescription {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name])
+}
+
+model Supplier {
+  id         String          @id @default(uuid())
+  businessId String
+  name       String
+  type       String          @default("supplier")
+  phone      String?
+  address    String?
+  notes      String?
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  business   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  tempos     SupplierTempo[]
+}
+
+model SupplierTempo {
+  id          String         @id @default(uuid())
+  businessId  String
+  supplierId  String
+  description String
+  totalAmount Float
+  paidAmount  Float          @default(0)
+  invoiceNo   String?
+  dueDate     DateTime
+  status      String         @default("pending")
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier    Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  payments    TempoPayment[]
+}
+
+model TempoPayment {
+  id          String        @id @default(uuid())
+  tempoId     String
+  amount      Float
+  paymentDate DateTime
+  notes       String?
+  createdAt   DateTime      @default(now())
+
+  tempo       SupplierTempo @relation(fields: [tempoId], references: [id], onDelete: Cascade)
 }

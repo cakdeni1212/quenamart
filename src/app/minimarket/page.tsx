@@ -43,10 +43,13 @@ export default function MinimarketPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [shift, setShift] = useState<"pagi" | "sore">("pagi");
   const [cashierName, setCashierName] = useState("");
+  const [selectedCashier, setSelectedCashier] = useState("");
+  const [customCashier, setCustomCashier] = useState("");
   const [salesAmount, setSalesAmount] = useState("");
   const [expenses, setExpenses] = useState<{ desc: string; amount: string; cat: string }[]>([]);
   const [newExpDesc, setNewExpDesc] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
+  const [customExpDesc, setCustomExpDesc] = useState("");
 
   // Report data
   const [reportData, setReportData] = useState<ShiftData[]>([]);
@@ -56,6 +59,8 @@ export default function MinimarketPage() {
 
   // Saved cashiers for autocomplete
   const [cashiers, setCashiers] = useState<string[]>([]);
+  const [savedCashiers, setSavedCashiers] = useState<{ id: string; name: string }[]>([]);
+  const [expenseDescriptions, setExpenseDescriptions] = useState<{ id: string; name: string }[]>([]);
 
   // Categories for minimarket
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
@@ -71,9 +76,15 @@ export default function MinimarketPage() {
         );
         if (minimarket) {
           setBusinessId(minimarket.id);
-          fetch(`/api/categories?businessId=${minimarket.id}`)
-            .then((r) => r.ok ? r.json() : { categories: [] })
-            .then((cat) => setCategories(cat.categories.filter((c: { categoryType: string }) => c.categoryType === "expense")));
+          Promise.all([
+            fetch(`/api/categories?businessId=${minimarket.id}`).then((r) => r.ok ? r.json() : { categories: [] }),
+            fetch(`/api/cashiers?businessId=${minimarket.id}`).then((r) => r.ok ? r.json() : { cashiers: [] }),
+            fetch(`/api/expense-descriptions?businessId=${minimarket.id}`).then((r) => r.ok ? r.json() : { descriptions: [] }),
+          ]).then(([cat, cash, desc]) => {
+            setCategories(cat.categories.filter((c: { categoryType: string }) => c.categoryType === "expense"));
+            setSavedCashiers(cash.cashiers);
+            setExpenseDescriptions(desc.descriptions);
+          });
         }
       })
       .catch(() => {});
@@ -98,10 +109,12 @@ export default function MinimarketPage() {
   }
 
   function addExpense() {
-    if (!newExpDesc || !newExpAmount) return;
-    setExpenses([...expenses, { desc: newExpDesc, amount: newExpAmount, cat: "" }]);
+    const finalDesc = newExpDesc === "__other__" ? customExpDesc : newExpDesc;
+    if (!finalDesc || !newExpAmount) return;
+    setExpenses([...expenses, { desc: finalDesc, amount: newExpAmount, cat: "" }]);
     setNewExpDesc("");
     setNewExpAmount("");
+    setCustomExpDesc("");
   }
 
   function removeExpense(i: number) {
@@ -110,7 +123,8 @@ export default function MinimarketPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!businessId || !salesAmount || !cashierName.trim()) {
+    const finalCashierName = selectedCashier === "__other__" ? customCashier : selectedCashier;
+    if (!businessId || !salesAmount || !finalCashierName.trim()) {
       setError("Omset, nama kasir, dan bisnis wajib diisi");
       return;
     }
@@ -130,9 +144,9 @@ export default function MinimarketPage() {
           amount: parseFloat(salesAmount),
           transactionDate: date,
           description: `Omset shift ${shift}`,
-          notes: `Kasir: ${cashierName.trim()}`,
+          notes: `Kasir: ${finalCashierName.trim()}`,
           shift,
-          cashierName: cashierName.trim(),
+          cashierName: finalCashierName.trim(),
         }),
       });
       if (!res1.ok) throw new Error("Gagal simpan omset");
@@ -148,9 +162,9 @@ export default function MinimarketPage() {
             amount: parseFloat(exp.amount),
             transactionDate: date,
             description: exp.desc,
-            notes: `Kasir: ${cashierName.trim()} · Shift ${shift}`,
+            notes: `Kasir: ${finalCashierName.trim()} · Shift ${shift}`,
             shift,
-            cashierName: cashierName.trim(),
+            cashierName: finalCashierName.trim(),
           }),
         });
       }
@@ -158,7 +172,9 @@ export default function MinimarketPage() {
       // Reset form
       setSalesAmount("");
       setExpenses([]);
+      setSelectedCashier("");
       setCashierName("");
+      setCustomCashier("");
       setError("");
 
       // Switch to report tab
@@ -249,20 +265,37 @@ export default function MinimarketPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nama Kasir</label>
-              <input
-                type="text"
-                value={cashierName}
-                onChange={(e) => setCashierName(e.target.value)}
-                placeholder="Nama kasir"
+              <select
+                value={selectedCashier}
+                onChange={(e) => {
+                  setSelectedCashier(e.target.value);
+                  if (e.target.value !== "__other__") {
+                    setCashierName(e.target.value);
+                    setCustomCashier("");
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                list="cashier-list"
                 required
-              />
-              <datalist id="cashier-list">
-                {cashiers.map((c) => (
-                  <option key={c} value={c} />
+              >
+                <option value="">Pilih Kasir</option>
+                {savedCashiers.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
-              </datalist>
+                <option value="__other__">+ Kasir Lain (tulis manual)</option>
+              </select>
+              {selectedCashier === "__other__" && (
+                <input
+                  type="text"
+                  value={customCashier}
+                  onChange={(e) => {
+                    setCustomCashier(e.target.value);
+                    setCashierName(e.target.value);
+                  }}
+                  placeholder="Nama kasir baru"
+                  className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+              )}
             </div>
           </div>
 
@@ -309,14 +342,30 @@ export default function MinimarketPage() {
             )}
 
             <div className="flex gap-2">
-              <input
-                type="text"
+              <select
                 value={newExpDesc}
-                onChange={(e) => setNewExpDesc(e.target.value)}
-                placeholder="Deskripsi pengeluaran"
+                onChange={(e) => {
+                  setNewExpDesc(e.target.value);
+                  if (e.target.value !== "__other__") setCustomExpDesc("");
+                }}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addExpense())}
-              />
+              >
+                <option value="">Deskripsi pengeluaran</option>
+                {expenseDescriptions.map((d) => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+                <option value="__other__">+ Lainnya</option>
+              </select>
+              {newExpDesc === "__other__" && (
+                <input
+                  type="text"
+                  value={customExpDesc}
+                  onChange={(e) => setCustomExpDesc(e.target.value)}
+                  placeholder="Tulis deskripsi"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addExpense())}
+                />
+              )}
               <input
                 type="number"
                 value={newExpAmount}
