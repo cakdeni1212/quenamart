@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { businessId, categoryId, transactionType, amount, transactionDate, description, notes } = body;
+  const { businessId, categoryId, transactionType, amount, transactionDate, description, notes, shift, cashierName } = body;
 
   if (!businessId || !transactionType || !amount) {
     return NextResponse.json(
@@ -92,6 +92,8 @@ export async function POST(req: NextRequest) {
       transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
       description: description || "",
       notes: notes || null,
+      shift: shift || null,
+      cashierName: cashierName || null,
       isPersonal: business.businessType === "personal",
     },
     include: {

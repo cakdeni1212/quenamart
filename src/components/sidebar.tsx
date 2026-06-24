@@ -10,6 +10,7 @@ import {
   Tags,
   BarChart3,
   User,
+  Store,
   LogOut,
   Menu,
   X,
@@ -33,6 +34,7 @@ export function Sidebar({ user }: SidebarProps) {
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/businesses", label: "Bisnis", icon: Building2 },
+    { href: "/minimarket", label: "Minimarket", icon: Store },
     { href: "/transactions", label: "Transaksi", icon: ArrowLeftRight },
     { href: "/categories", label: "Kategori", icon: Tags },
     { href: "/assets", label: "Aset", icon: Boxes },

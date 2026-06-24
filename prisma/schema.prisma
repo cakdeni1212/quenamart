@@ -88,6 +88,8 @@ model Transaction {
   description     String
   notes           String?
   amount          Float
+  shift           String?
+  cashierName     String?
   isPersonal      Boolean      @default(false)
   isConfirmed     Boolean      @default(true)
   isDeleted       Boolean      @default(false)
