@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String              @id @default(uuid())
+  name          String
+  email         String              @unique
+  passwordHash  String
+  phone         String?
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  businesses    Business[]
+  memberships   BusinessMembership[]
+  transactions  Transaction[]
+}
+
+model Business {
+  id           String              @id @default(uuid())
+  ownerId      String
+  name         String
+  slug         String              @unique
+  businessType String              @default("general")
+  description  String?
+  isArchived   Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  owner        User                @relation(fields: [ownerId], references: [id])
+  memberships  BusinessMembership[]
+  categories   Category[]
+  transactions Transaction[]
+  assets       Asset[]
+}
+
+model BusinessMembership {
+  id         String   @id @default(uuid())
+  businessId String
+  userId     String
+  role       String   @default("owner")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+}
+
+model Category {
+  id           String     @id @default(uuid())
+  businessId   String?
+  code         String?
+  name         String
+  categoryType String     @default("expense")
+  parentId     String?
+  isSystem     Boolean    @default(false)
+  isActive     Boolean    @default(true)
+  sortOrder    Int        @default(0)
+  appliesTo    String     @default("all")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  business     Business?  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  parent       Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[] @relation("CategoryHierarchy")
+  transactions Transaction[]
+
+  @@unique([businessId, code])
+}
+
+model Transaction {
+  id              String       @id @default(uuid())
+  businessId      String
+  categoryId      String?
+  createdById     String?
+  transactionType String       @default("expense")
+  referenceNo     String?
+  transactionDate DateTime
+  description     String
+  notes           String?
+  amount          Float
+  isPersonal      Boolean      @default(false)
+  isConfirmed     Boolean      @default(true)
+  isDeleted       Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  business        Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category        Category?    @relation(fields: [categoryId], references: [id])
+  createdBy       User?        @relation(fields: [createdById], references: [id])
+  attachments     Attachment[]
+}
+
+model Asset {
+  id            String    @id @default(uuid())
+  businessId    String
+  name          String
+  assetType     String    @default("equipment")
+  value         Float     @default(0)
+  purchasePrice Float     @default(0)
+  purchaseDate  DateTime?
+  notes         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model Attachment {
+  id            String      @id @default(uuid())
+  transactionId String
+  fileName      String
+  filePath      String
+  fileType      String
+  fileSize      Int
+  createdAt     DateTime    @default(now())
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+}
