@@ -62,6 +62,7 @@ export async function initDatabase() {
         dueDate TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
         notes TEXT,
+        receipt TEXT,
         createdAt TEXT NOT NULL DEFAULT (datetime('now')),
         updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (businessId) REFERENCES Business(id) ON DELETE CASCADE,
@@ -76,6 +77,7 @@ export async function initDatabase() {
         amount REAL NOT NULL,
         paymentDate TEXT NOT NULL,
         notes TEXT,
+        receipt TEXT,
         createdAt TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (tempoId) REFERENCES SupplierTempo(id) ON DELETE CASCADE
       )

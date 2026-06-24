@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       supplier: { select: { id: true, name: true, type: true } },
       business: { select: { id: true, name: true } },
       payments: {
-        select: { id: true, amount: true, paymentDate: true, notes: true },
+        select: { id: true, amount: true, paymentDate: true, notes: true, receipt: true },
         orderBy: { paymentDate: "desc" },
       },
     },
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { businessId, supplierId, description, totalAmount, dueDate, invoiceNo, notes } = await req.json();
+  const { businessId, supplierId, description, totalAmount, dueDate, invoiceNo, notes, receipt } = await req.json();
 
   if (!businessId || !supplierId || !description || !totalAmount || !dueDate) {
     return NextResponse.json(
@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
       dueDate: due,
       invoiceNo: invoiceNo || null,
       notes: notes || null,
+      receipt: receipt || null,
       status: due < now ? "overdue" : "pending",
     },
     include: {

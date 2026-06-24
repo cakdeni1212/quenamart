@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Loader2, Truck, UserRound, Clock, CheckCircle, AlertTriangle, DollarSign, Calendar } from "lucide-react";
+import { Plus, Loader2, Truck, UserRound, Clock, CheckCircle, AlertTriangle, DollarSign, Calendar, Image as ImageIcon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { ImageUpload } from "@/components/image-upload";
 
 interface Tempo {
   id: string;
@@ -14,9 +15,10 @@ interface Tempo {
   status: string;
   invoiceNo: string | null;
   notes: string | null;
+  receipt: string | null;
   supplier: { id: string; name: string; type: string };
   business: { id: string; name: string };
-  payments: { id: string; amount: number; paymentDate: string; notes: string | null }[];
+  payments: { id: string; amount: number; paymentDate: string; notes: string | null; receipt: string | null }[];
 }
 
 interface Supplier {
@@ -55,6 +57,7 @@ export default function TempoPage() {
   const [newDueDate, setNewDueDate] = useState("");
   const [newInvoiceNo, setNewInvoiceNo] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [newReceipt, setNewReceipt] = useState<string | null>(null);
 
   async function fetchTempos() {
     const params = new URLSearchParams();
@@ -106,11 +109,12 @@ export default function TempoPage() {
         dueDate: newDueDate,
         invoiceNo: newInvoiceNo.trim() || null,
         notes: newNotes.trim() || null,
+        receipt: newReceipt || null,
       }),
     });
     if (res.ok) {
       setNewSupplierId(""); setNewDescription(""); setNewTotalAmount(""); setNewDueDate("");
-      setNewInvoiceNo(""); setNewNotes("");
+      setNewInvoiceNo(""); setNewNotes(""); setNewReceipt(null);
       setTab("list");
       fetchTempos();
     }
@@ -239,6 +243,10 @@ export default function TempoPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Foto Resi/Nota</label>
+              <ImageUpload value={newReceipt} onChange={setNewReceipt} />
+            </div>
           </div>
           <button
             onClick={handleCreate}
@@ -362,12 +370,34 @@ export default function TempoPage() {
                         <div className="space-y-1">
                           {t.payments.slice(0, 3).map((p) => (
                             <div key={p.id} className="flex items-center justify-between text-xs text-gray-600">
-                              <span>{new Date(p.paymentDate).toLocaleDateString("id-ID")}</span>
-                              <span className="font-medium text-emerald-600">{formatCurrency(p.amount)}</span>
-                              {p.notes && <span className="text-gray-400 truncate ml-2">- {p.notes}</span>}
+                              <div className="flex items-center gap-2">
+                                <span>{new Date(p.paymentDate).toLocaleDateString("id-ID")}</span>
+                                <span className="font-medium text-emerald-600">{formatCurrency(p.amount)}</span>
+                                {p.notes && <span className="text-gray-400 truncate">- {p.notes}</span>}
+                              </div>
+                              {p.receipt && (
+                                <button
+                                  onClick={() => window.open(p.receipt!, "_blank")}
+                                  className="text-gray-400 hover:text-emerald-600"
+                                  title="Lihat bukti pembayaran"
+                                >
+                                  <ImageIcon className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+                    {t.receipt && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => window.open(t.receipt!, "_blank")}
+                          className="flex items-center gap-2 text-xs text-gray-500 hover:text-emerald-600"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Lihat Nota Pembelian
+                        </button>
                       </div>
                     )}
                   </div>

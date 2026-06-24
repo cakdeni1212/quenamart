@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, DollarSign, Truck, UserRound } from "lucide-react";
+import { ArrowLeft, Save, DollarSign, Truck, UserRound, Image as ImageIcon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { ImageUpload } from "@/components/image-upload";
 
 interface TempoDetail {
   id: string;
@@ -16,7 +17,7 @@ interface TempoDetail {
   invoiceNo: string | null;
   supplier: { id: string; name: string; type: string };
   business: { id: string; name: string };
-  payments: { id: string; amount: number; paymentDate: string; notes: string | null }[];
+  payments: { id: string; amount: number; paymentDate: string; notes: string | null; receipt: string | null }[];
 }
 
 export function TempoPayForm() {
@@ -30,6 +31,7 @@ export function TempoPayForm() {
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [receipt, setReceipt] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export function TempoPayForm() {
         amount: parseFloat(amount),
         paymentDate,
         notes: notes.trim() || null,
+        receipt: receipt || null,
       }),
     });
 
@@ -193,6 +196,11 @@ export function TempoPayForm() {
           />
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Pembayaran</label>
+          <ImageUpload value={receipt} onChange={setReceipt} />
+        </div>
+
         <button
           type="submit"
           disabled={saving}
@@ -216,6 +224,15 @@ export function TempoPayForm() {
                     {p.notes && ` · ${p.notes}`}
                   </p>
                 </div>
+                {p.receipt && (
+                  <button
+                    onClick={() => window.open(p.receipt!, "_blank")}
+                    className="text-gray-400 hover:text-emerald-600"
+                    title="Lihat bukti"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

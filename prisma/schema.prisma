@@ -188,6 +188,7 @@ model SupplierTempo {
   dueDate     DateTime
   status      String         @default("pending")
   notes       String?
+  receipt     String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -202,6 +203,7 @@ model TempoPayment {
   amount      Float
   paymentDate DateTime
   notes       String?
+  receipt     String?
   createdAt   DateTime      @default(now())
 
   tempo       SupplierTempo @relation(fields: [tempoId], references: [id], onDelete: Cascade)

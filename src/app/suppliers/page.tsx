@@ -18,6 +18,7 @@ interface Supplier {
 interface Business {
   id: string;
   name: string;
+  businessType: string;
 }
 
 export default function SuppliersPage() {

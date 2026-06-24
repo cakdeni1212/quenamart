@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { tempoId, amount, paymentDate, notes } = await req.json();
+  const { tempoId, amount, paymentDate, notes, receipt } = await req.json();
 
   if (!tempoId || !amount) {
     return NextResponse.json(
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       amount: payAmount,
       paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
       notes: notes || null,
+      receipt: receipt || null,
     },
   });
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
       supplier: { select: { id: true, name: true, type: true } },
       business: { select: { id: true, name: true } },
       payments: {
-        select: { id: true, amount: true, paymentDate: true, notes: true },
+        select: { id: true, amount: true, paymentDate: true, notes: true, receipt: true },
         orderBy: { paymentDate: "desc" },
       },
     },
