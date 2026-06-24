@@ -55,7 +55,8 @@ export default function SuppliersPage() {
       .then((r) => r.json())
       .then((d) => {
         setBusinesses(d.businesses);
-        setNewBusinessId(d.businesses[0]?.id || "");
+        const mm = d.businesses.find((b: Business) => b.businessType === "minimarket" || b.name.toLowerCase().includes("minimarket"));
+        setNewBusinessId(mm?.id || d.businesses[0]?.id || "");
       });
   }, []);
 
