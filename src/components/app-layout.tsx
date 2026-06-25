@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "./sidebar";
 import { UserProvider } from "./user-provider";
+import { CashierGuard } from "./cashier-guard";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "quenamart-secret-key-change-in-production"
@@ -19,7 +20,7 @@ async function getUser() {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, role: true },
     });
 
     return user;
@@ -31,7 +32,6 @@ async function getUser() {
 export async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
 
-  // If no user session, render clean layout without sidebar
   if (!user) {
     return (
       <UserProvider initialUser={null}>
@@ -45,7 +45,7 @@ export async function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-full w-full">
         <Sidebar user={user} />
         <main className="flex-1 min-w-0 p-4 lg:p-8 pt-16 lg:pt-8">
-          {children}
+          <CashierGuard>{children}</CashierGuard>
         </main>
       </div>
     </UserProvider>

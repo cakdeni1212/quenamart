@@ -8,6 +8,10 @@ export async function initDatabase() {
 
   try {
     await prisma.$executeRawUnsafe(`
+      ALTER TABLE User ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS Cashier (
         id TEXT PRIMARY KEY,
         businessId TEXT NOT NULL,

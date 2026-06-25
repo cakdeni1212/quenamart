@@ -19,11 +19,32 @@ import {
   Settings,
   Truck,
   Calendar,
+  Shield,
 } from "lucide-react";
 
 interface SidebarProps {
-  user: { id: string; name: string; email: string } | null;
+  user: { id: string; name: string; email: string; role: string } | null;
 }
+
+const ownerLinks = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/businesses", label: "Bisnis", icon: Building2 },
+  { href: "/minimarket", label: "Minimarket", icon: Store },
+  { href: "/transactions", label: "Transaksi", icon: ArrowLeftRight },
+  { href: "/categories", label: "Kategori", icon: Tags },
+  { href: "/suppliers", label: "Supplier/Sales", icon: Truck },
+  { href: "/tempo", label: "Tempo", icon: Calendar },
+  { href: "/assets", label: "Aset", icon: Boxes },
+  { href: "/reports", label: "Laporan", icon: BarChart3 },
+  { href: "/personal", label: "Pribadi", icon: User },
+  { href: "/settings", label: "Pengaturan", icon: Settings },
+];
+
+const cashierLinks = [
+  { href: "/minimarket", label: "Minimarket", icon: Store },
+  { href: "/suppliers", label: "Supplier/Sales", icon: Truck },
+  { href: "/tempo", label: "Tempo", icon: Calendar },
+];
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
@@ -34,19 +55,8 @@ export function Sidebar({ user }: SidebarProps) {
     setMobileOpen(false);
   }, [pathname]);
 
-  const links = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/businesses", label: "Bisnis", icon: Building2 },
-    { href: "/minimarket", label: "Minimarket", icon: Store },
-    { href: "/transactions", label: "Transaksi", icon: ArrowLeftRight },
-    { href: "/categories", label: "Kategori", icon: Tags },
-    { href: "/suppliers", label: "Supplier/Sales", icon: Truck },
-    { href: "/tempo", label: "Tempo", icon: Calendar },
-    { href: "/assets", label: "Aset", icon: Boxes },
-    { href: "/reports", label: "Laporan", icon: BarChart3 },
-    { href: "/personal", label: "Pribadi", icon: User },
-    { href: "/settings", label: "Pengaturan", icon: Settings },
-  ];
+  const isCashier = user?.role === "cashier";
+  const links = isCashier ? cashierLinks : ownerLinks;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -120,15 +130,21 @@ export function Sidebar({ user }: SidebarProps) {
         {user && (
           <div className="p-3 border-t border-gray-100">
             <div className={`flex items-center gap-3 px-3 py-2 ${collapsed && "justify-center"}`}>
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-semibold text-emerald-700">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isCashier ? "bg-amber-100" : "bg-emerald-100"}`}>
+                {isCashier ? (
+                  <Shield className="w-4 h-4 text-amber-600" />
+                ) : (
+                  <span className="text-sm font-semibold text-emerald-700">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
               {!collapsed && (
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {isCashier ? "Kasir" : user.email}
+                  </p>
                 </div>
               )}
             </div>
