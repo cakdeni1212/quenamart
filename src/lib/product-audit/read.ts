@@ -41,6 +41,7 @@ export type FieldAuditRecord = {
   review: {
     status: string;
     reviewedAt: string;
+    evidenceNotes: string | null;
   } | null;
   reconciliation: {
     eventType: string;
@@ -92,7 +93,11 @@ function reviewFor(rows: DbRow[], field: FieldKey, outletId: string | null, sour
   const row = rows.find((item) => item.field_key === field
     && item.outlet_id === outletId
     && item.source_import_row_id === sourceRowId);
-  return row ? { status: String(row.status), reviewedAt: String(row.reviewed_at) } : null;
+  return row ? {
+    status: String(row.status),
+    reviewedAt: String(row.reviewed_at),
+    evidenceNotes: typeof row.evidence_notes === "string" ? row.evidence_notes : null,
+  } : null;
 }
 
 function overrideFor(rows: DbRow[], field: FieldKey, outletId: string | null, barcodeId?: string) {
@@ -159,9 +164,11 @@ export async function readProductFieldAudit(productId: string): Promise<ProductF
       .select("id, field_key, outlet_id, barcode_id, corrected_value, reason, source_import_row_id, corrected_by, corrected_at")
       .eq("product_id", productId).eq("is_active", true).in("field_key", allowedFields),
     supabase.from("product_field_audit_reviews")
-      .select("field_key, outlet_id, status, source_import_row_id, reviewer_id, reviewed_at, barcode_id")
+      .select("id, field_key, outlet_id, status, source_import_row_id, reviewer_id, reviewed_at, created_at, evidence_notes, barcode_id")
       .eq("product_id", productId).in("field_key", safeReviewFields)
-      .order("reviewed_at", { ascending: false }),
+      .order("reviewed_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
     supabase.from("product_field_reconciliation_events")
       .select("field_key, outlet_id, override_id, event_type, source_import_row_id, source_value, effective_value, created_at")
       .eq("product_id", productId).eq("outlet_id", snapshot.outlet_id).in("field_key", safeEventFields)

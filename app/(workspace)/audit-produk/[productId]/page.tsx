@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AUDIT_FIELDS, AUDIT_FINDINGS, parseAuditContext } from "@/lib/product-audit/context";
 import { readProductFieldAudit } from "@/lib/product-audit/read";
 import type { FieldAuditRecord } from "@/lib/product-audit/read";
+import { FieldReviewControls } from "@/components/product-audit/field-review-controls";
 
 type SearchParams = Promise<{ finding?: string | string[]; field?: string | string[] }>;
 
@@ -36,10 +37,12 @@ function LocalizedTime({ value }: { value: string }) {
 function FieldCard({
   title,
   record,
+  productId,
   financial = false,
 }: {
   title: string;
   record: FieldAuditRecord;
+  productId: string;
   financial?: boolean;
 }) {
   const formatValue = financial ? money : display;
@@ -58,6 +61,9 @@ function FieldCard({
       </span>}
       {record.sourceRowId && <span className="audit-provenance-note">Sumber terikat pada snapshot produk saat ini.</span>}
     </div>
+    <FieldReviewControls key={`${productId}-${record.field}-${record.sourceRowId}-${record.review?.status}-${record.review?.evidenceNotes}`} productId={productId} fieldKey={record.field} outletId={record.outletId}
+      sourceRowId={record.sourceRowId} status={record.review?.status ?? null}
+      evidenceNotes={record.review?.evidenceNotes ?? null} />
   </section>;
 }
 
@@ -87,8 +93,8 @@ export default async function ProductFieldAuditPage({
 
   return <main className="page-content audit-detail-page">
     <Link className="quiet-button audit-back-link" href={backHref}>← Kembali ke antrean audit</Link>
-    <div className="eyebrow audit-detail-eyebrow">PEMERIKSAAN PRODUK · BACA SAJA</div>
-    <div className="audit-detail-heading"><div><h1>{data.product.name}</h1><p>SKU {data.product.sku}{data.product.category ? ` · ${data.product.category}` : ""}</p></div><span className="audit-readonly-pill">Belum ada aksi perubahan</span></div>
+    <div className="eyebrow audit-detail-eyebrow">PEMERIKSAAN PRODUK</div>
+    <div className="audit-detail-heading"><div><h1>{data.product.name}</h1><p>SKU {data.product.sku}{data.product.category ? ` · ${data.product.category}` : ""}</p></div><span className="audit-readonly-pill">Nilai produk tetap baca saja</span></div>
 
     {context.invalid && <div className="audit-context-notice" role="status">Konteks audit pada tautan tidak cocok atau tidak tersedia. Temuan aktif di bawah tetap berasal dari snapshot tersimpan.</div>}
 
@@ -111,12 +117,15 @@ export default async function ProductFieldAuditPage({
               {record.override && <div className="audit-override-value"><dt>Penggantian sumber aktif</dt><dd>{display(record.override.value)}</dd><small>{record.override.reason}</small><small>Koreksi tercatat · <LocalizedTime value={record.override.correctedAt} /></small></div>}
             </dl>
             <div className="audit-field-meta">{record.review ? <>Petugas tercatat · <LocalizedTime value={record.review.reviewedAt} /></> : "Belum ada pemeriksaan untuk sumber ini"}{record.reconciliation && <span className={record.reconciliation.eventType === "SOURCE_CONFLICT" ? "audit-reconciliation-conflict" : "audit-reconciliation-ok"}>{reconciliationLabels[record.reconciliation.eventType] ?? "Pembaruan sumber tercatat"}</span>}</div>
+            <FieldReviewControls key={`${data.product.id}-${record.field}-${record.sourceRowId}-${record.review?.status}-${record.review?.evidenceNotes}`} productId={data.product.id} fieldKey={record.field} outletId={record.outletId}
+              sourceRowId={record.sourceRowId} status={record.review?.status ?? null}
+              evidenceNotes={record.review?.evidenceNotes ?? null} />
           </section>;
         }
-        return <FieldCard key={field} title={AUDIT_FIELDS[field]} record={record} financial={field === "hpp" || field === "selling_price"} />;
+        return <FieldCard key={field} title={AUDIT_FIELDS[field]} record={record} productId={data.product.id} financial={field === "hpp" || field === "selling_price"} />;
       })}
       {selectedField && ![...fieldOrder, "name"].includes(selectedField as never) && <div className="surface-card audit-field-card"><h2>{AUDIT_FIELDS[selectedField]}</h2><p>Nilai audit untuk bidang ini tidak tersedia melalui pembacaan aman Phase 3B.1A.</p></div>}
-      {selectedField === "quantity" || selectedField === "minimum_quantity" || data.product.findingCodes.some((code) => code === "ZERO_STOCK" || code === "STOCK_AT_OR_BELOW_MINIMUM") ? <section className="surface-card audit-stock-card"><span className="eyebrow">INFORMASI SAJA</span><h2>Stok & stok minimum</h2><dl className="audit-value-grid"><div><dt>Jumlah stok ternormalisasi</dt><dd>{display(data.stock.quantity)}</dd></div><div><dt>Minimum stok ternormalisasi</dt><dd>{display(data.stock.minimumQuantity)}</dd></div></dl><p>Nilai ini merupakan catatan snapshot iPos. Perubahan stok belum tersedia di alur audit ini.</p></section> : null}
+      {selectedField === "quantity" || selectedField === "minimum_quantity" || data.product.findingCodes.some((code) => code === "ZERO_STOCK" || code === "STOCK_AT_OR_BELOW_MINIMUM") ? <section className="surface-card audit-stock-card"><span className="eyebrow">INFORMASI SAJA</span><h2>Stok & stok minimum</h2><dl className="audit-value-grid"><div><dt>Jumlah stok ternormalisasi</dt><dd>{display(data.stock.quantity)}</dd></div><div><dt>Minimum stok ternormalisasi</dt><dd>{display(data.stock.minimumQuantity)}</dd></div></dl><p>Nilai ini merupakan catatan snapshot iPos. Perubahan stok belum tersedia di alur audit ini.</p>{data.fields.quantity && <FieldReviewControls key={`${data.product.id}-quantity-${data.stock.sourceRowId}-${data.fields.quantity.review?.status}-${data.fields.quantity.review?.evidenceNotes}`} productId={data.product.id} fieldKey="quantity" outletId={data.outletId} sourceRowId={data.stock.sourceRowId} status={data.fields.quantity.review?.status ?? null} evidenceNotes={data.fields.quantity.review?.evidenceNotes ?? null} />}{data.fields.minimum_quantity && <FieldReviewControls key={`${data.product.id}-minimum_quantity-${data.stock.sourceRowId}-${data.fields.minimum_quantity.review?.status}-${data.fields.minimum_quantity.review?.evidenceNotes}`} productId={data.product.id} fieldKey="minimum_quantity" outletId={data.outletId} sourceRowId={data.stock.sourceRowId} status={data.fields.minimum_quantity.review?.status ?? null} evidenceNotes={data.fields.minimum_quantity.review?.evidenceNotes ?? null} />}</section> : null}
     </section>
     <p className="audit-detail-footnote">Status verifikasi manusia, temuan snapshot iPos, koreksi aktif, dan rekonsiliasi sumber adalah catatan terpisah. Verifikasi tidak menutup temuan sumber.</p>
   </main>;

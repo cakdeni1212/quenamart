@@ -62,4 +62,18 @@
 
 - Added a server-only field-audit read model and `/audit-produk/[productId]` detail screen. It separates snapshot findings, source/current values, human review, active overrides, and reconciliation state; stock/minimum remain informational.
 - Financial source/audit reads are loaded only for OWNER/ADMIN. GUDANG receives only nonfinancial source, review, override, reconciliation, and inventory data through the session-bound Supabase server client. No mutation RPCs or service-role client are used.
-- Added issue-badge navigation from the existing product list and focused read-model/query-context contract tests. This is a read-only first slice; Phase 3B.1B is not complete, and review/correction actions, next-item navigation, and staging runtime verification remain pending.
+- Added issue-badge navigation from the existing product list and focused read-model/query-context contract tests. This is a read-only first slice; review actions were added later in Phase 3B.1B-2A, while corrections, next-item navigation, and staging runtime verification remain pending.
+
+## 2026-09-29 — Human field review workflow (Phase 3B.1B-2A)
+
+- Added authenticated server action and focused audit controls for starting a field review and marking it verified through the deployed `record_product_field_review` RPC.
+- The action derives the active profile from the cookie session, checks audit access and field permissions, re-reads the current source row before submitting, and does not accept actor/role values from the browser. It uses the normal session-bound Supabase client; no correction RPC or service-role client is used.
+- Review status and optional evidence remain separate from imported findings, overrides, and source reconciliation. Stock/minimum can be reviewed as informational fields, but no stock values can be changed. HPP source reads remain OWNER/ADMIN-only.
+- Mutation runtime verification remains pending in isolated staging with authenticated role sessions; no production mutation test was run.
+
+## 2026-09-29 — Review retry/idempotency hardening (Phase 3B.1B-2A)
+
+- Review forms now use database-issued, actor- and canonical-payload-bound intent UUIDs. The browser persists only the opaque ID so the same pending/unknown intent can be recovered after reload; confirmed success consumes it, and a later action receives a new ID.
+- Added local, forward-only migration `20260929150000_product_field_review_notes_idempotency_v1.sql` so review RPC retries compare the same trimmed evidence note stored by the RPC. This migration is **LOCAL / NOT DEPLOYED**.
+- Added local, forward-only migration `20260929160000_product_field_review_intents_v1.sql` for the private intent registry and issue/read RPCs. Exact completed retries reach database replay before freshness checks; fresh intents are checked against current source before issuing and again transactionally by the review RPC. This migration is **LOCAL / NOT DEPLOYED**.
+- Added safe typed error handling and deterministic latest-review ordering. Phase 3B.1B-2A has not been production runtime verified; authenticated review mutation verification remains pending in isolated staging.

@@ -18,7 +18,10 @@
 - [ ] Provision/use isolated staging with synthetic product/import fixtures and real authenticated OWNER, ADMIN, GUDANG, and KASIR sessions; run the Phase 3B.1A runtime matrix without using production fixtures.
 - [ ] In staging, verify review authorization/transitions/idempotency; correction authorization and request idempotency; barcode `ADD_ALIAS`, `REPLACE_SOURCE`, and duplicate conflict; KASIR/anonymous denials; and controlled re-import reconciliation/finalizer behavior.
 - [x] Implement Phase 3B.1B-1 read-only focused Product Field Audit detail at `/audit-produk/[productId]`, with role-safe source/current/review/override/reconciliation reads and no mutation actions.
-- [ ] Continue Phase 3B.1B with review/correction actions and field controls only after the isolated-staging Phase 3B.1A runtime matrix is reviewed.
+- [x] Implement Phase 3B.1B-2A human field-review transitions on `/audit-produk/[productId]` through `record_product_field_review`; correction controls remain out of scope.
+- [ ] Review and deploy the local-only forward migrations `20260929150000_product_field_review_notes_idempotency_v1.sql` and `20260929160000_product_field_review_intents_v1.sql`; both are **NOT DEPLOYED**.
+- [ ] Verify review mutation authorization, transitions, stale-source handling, and request idempotency in isolated staging with real authenticated role sessions. Phase 3B.1B-2A is not production runtime verified; no production mutation test has been run.
+- [ ] Continue Phase 3B.1B with correction actions/controls only after isolated-staging Phase 3B.1A runtime verification is reviewed.
 - [x] Configure `IPOS_COMMIT_SECRET` only in a trusted server/operator secret store and perform the approved production commit after verifying the preflight.
 - [x] Independently verify products, row links, histories, findings, provenance, and unchanged raw JSON after the production commit.
 - [x] Use database advisory lock `(734921, 2)` in the deployed Phase 3B.1A product correction/import reconciliation functions.
