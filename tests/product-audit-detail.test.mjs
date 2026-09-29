@@ -44,7 +44,7 @@ test('source, current values, human review, overrides, and reconciliation remain
   assert.match(loader, /product_field_audit_reviews/);
   assert.match(loader, /product_field_overrides/);
   assert.match(loader, /product_field_reconciliation_events/);
-  assert.match(page, /Verifikasi tidak menutup temuan sumber/);
+  assert.match(page, /Cek petugas tidak menghapus temuan iPos/);
   assert.match(page, /record\.review/);
   assert.match(page, /record\.reconciliation/);
 });

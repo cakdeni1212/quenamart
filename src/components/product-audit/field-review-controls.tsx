@@ -203,7 +203,7 @@ export function FieldReviewControls({ productId, fieldKey, outletId, sourceRowId
       <span className="field-review-current-label">Status pemeriksaan</span>
       <strong>{inProgress ? "Sedang diperiksa" : status === "SUDAH_DIVERIFIKASI" ? "Sudah dicek" : "Belum dicek"}</strong>
     </div>
-    <p className="field-review-explainer">Pemeriksaan petugas adalah catatan terpisah. Menandai sudah dicek tidak menghapus atau menyelesaikan temuan dari iPos.</p>
+    <p className="field-review-explainer">Cek barang fisik dan pastikan datanya sesuai. Pemeriksaan ini tidak menghapus temuan iPos.</p>
     {restored && <p className="field-review-feedback" role="status">Ada permintaan sebelumnya yang belum terkonfirmasi. Data permintaan lama dipertahankan agar aman dikirim ulang.</p>}
     <form onSubmit={submit} className="field-review-form">
       <label htmlFor={`review-notes-${productId}-${fieldKey}`}>Catatan singkat (opsional)</label>

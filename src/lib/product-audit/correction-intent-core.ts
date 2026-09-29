@@ -31,7 +31,78 @@ export type CorrectionIntentActionResult =
 
 export type ApplyCorrectionIntentActionResult =
   | { ok: true; outcome: "APPLIED" | "BARCODE_CONFLICT"; sourceSynchronized: boolean | null }
-  | { ok: false; code: "VALIDATION" | "DENIED" | "UNAVAILABLE"; message: string };
+  | { ok: false; code: "VALIDATION" | "DENIED" | "STALE" | "UNAVAILABLE"; message: string };
+
+export type CorrectionIntentStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+export function correctionIntentStorageKey(productId: string, field: CorrectionField) {
+  return `quena:product-correction-intent:${productId}:${field}`;
+}
+
+export function readStoredCorrectionRequestId(storage: CorrectionIntentStorage, productId: string, field: CorrectionField): string | null {
+  const value = storage.getItem(correctionIntentStorageKey(productId, field));
+  return parseCorrectionIntentRequestId(value);
+}
+
+export function storeCorrectionRequestId(storage: CorrectionIntentStorage, productId: string, field: CorrectionField, requestId: string) {
+  if (!isUuid(requestId)) throw new Error("Invalid correction request ID");
+  storage.setItem(correctionIntentStorageKey(productId, field), requestId);
+}
+
+export function forgetCorrectionRequestId(storage: CorrectionIntentStorage, productId: string, field: CorrectionField) {
+  storage.removeItem(correctionIntentStorageKey(productId, field));
+}
+
+/** Parse Indonesian currency notation exactly as decimal digits before converting for JSON RPC. */
+export function parseIndonesianMoney(input: string): { value: number; canonical: string } | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  let whole: string;
+  let fraction = "";
+  if (raw.includes(",")) {
+    const match = /^(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?$/.exec(raw);
+    if (!match) return null;
+    whole = match[1].replaceAll(".", "");
+    fraction = match[2] ?? "";
+  } else if (raw.includes(".")) {
+    const grouped = /^(\d{1,3}(?:\.\d{3})+)$/.exec(raw);
+    if (grouped) whole = raw.replaceAll(".", "");
+    else {
+      const decimal = /^(\d+)\.(\d{1,2})$/.exec(raw);
+      if (!decimal) return null;
+      whole = decimal[1];
+      fraction = decimal[2];
+    }
+  } else {
+    if (!/^\d+$/.test(raw)) return null;
+    whole = raw;
+  }
+  const integer = BigInt(whole);
+  const cents = integer * BigInt(100) + BigInt((fraction + "00").slice(0, 2));
+  if (cents < BigInt(0) || cents > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const canonical = `${integer.toString()}.${(fraction + "00").slice(0, 2)}`;
+  const value = Number(canonical);
+  if (!Number.isFinite(value) || value >= 1_000_000_000_000) return null;
+  return { value, canonical };
+}
+
+export function formatIndonesianMoney(value: string | number | null): string {
+  if (value === null) return "—";
+  const raw = String(value);
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!match) return raw;
+  const whole = BigInt(match[1]).toString();
+  const fraction = (match[2] ?? "").replace(/0+$/, "");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `Rp ${grouped}${fraction ? `,${fraction}` : ""}`;
+}
+
+export function formatIndonesianMoneyInput(input: string): string {
+  const parsed = parseIndonesianMoney(input);
+  if (!parsed) return input.trim();
+  const [whole, fraction] = parsed.canonical.split(".");
+  return formatIndonesianMoney(`${whole}.${fraction}`);
+}
 
 export function parseCorrectionIntentRequestId(value: unknown): string | null {
   return typeof value === "string" && isUuid(value) ? value : null;
@@ -51,6 +122,10 @@ export function canIssueCorrectionIntent(role: UserRole, field: CorrectionField)
   return canAccessSection(role, "audit-produk")
     && role !== "KASIR"
     && (role !== "GUDANG" || field === "barcode" || field === "rack_label");
+}
+
+export function correctionReviewEligible(status: string | null, sourceRowId: string | null): boolean {
+  return status === "SEDANG_DICEK" && sourceRowId !== null && isUuid(sourceRowId);
 }
 
 export function parseCorrectionIntentInput(formData: FormData): CorrectionIntentInput | null {
@@ -90,11 +165,9 @@ export function parseCorrectionIntentInput(formData: FormData): CorrectionIntent
     if (!rawValue.replace(/^[\s]+|[\s]+$/g, "") || /[\u0000-\u001f\u007f-\u009f]/u.test(rawValue)) return null;
     if (fieldKey === "barcode" && rawValue.replace(/^[\s]+|[\s]+$/g, "").length > 256) return null;
   } else {
-    // Accept plain decimal input here. A currency-formatted UI can normalize
-    // Indonesian separators before this server action is called.
-    if (!/^\d+(?:\.\d{1,2})?$/.test(rawValue.trim())) return null;
-    correctedValue = Number(rawValue.trim());
-    if (!Number.isFinite(correctedValue) || correctedValue >= 1_000_000_000_000) return null;
+    const money = parseIndonesianMoney(rawValue);
+    if (!money) return null;
+    correctedValue = money.value;
   }
 
   return { productId, outletId, fieldKey, sourceImportRowId, correctedValue, reason, barcodeOperation };

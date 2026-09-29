@@ -115,6 +115,9 @@ export async function applyProductFieldCorrectionIntentAction(
       if (error.code === "42501") {
         return { ok: false, code: "DENIED", message: "Akun ini tidak memiliki akses koreksi." };
       }
+      if (error.code === "40001" || /source changed|begin review for the current source row|source row does not belong|outlet mismatch/i.test(error.message)) {
+        return { ok: false, code: "STALE", message: "Data sumber berubah. Muat ulang pemeriksaan sebelum melanjutkan." };
+      }
       logCorrectionIntentFailure("apply_rpc", error);
       return { ok: false, code: "UNAVAILABLE", message: "Koreksi belum dapat diproses. Periksa status audit lalu coba lagi." };
     }

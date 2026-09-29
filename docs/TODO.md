@@ -21,10 +21,10 @@
 - [x] Implement Phase 3B.1B-2A human field-review transitions on `/audit-produk/[productId]` through `record_product_field_review`; correction controls remain out of scope.
 - [x] Deploy review idempotency/intent migrations `20260929150000_product_field_review_notes_idempotency_v1.sql` and `20260929160000_product_field_review_intents_v1.sql`; authenticated mutation runtime verification remains pending in isolated staging.
 - [ ] Verify review mutation authorization, transitions, stale-source handling, and request idempotency in isolated staging with real authenticated role sessions. Phase 3B.1B-2A is not production runtime verified; no production mutation test has been run.
-- [ ] Continue Phase 3B.1B with correction actions/controls only after isolated-staging Phase 3B.1A runtime verification is reviewed.
+- [x] Implement Phase 3B.1B-2B.2 correction controls on `/audit-produk/[productId]` using the deployed UUID-only correction intent path; no correction migration was needed.
+- [ ] Verify correction intent issuance/recovery, correction replay/conflict, role permissions, and concurrency in isolated staging with dedicated authenticated roles and synthetic fixtures. Phase 3B.1B-2B.2 is not production mutation/runtime verified; do not run mutation tests against production.
 - [x] Implement Phase 3B.1B-2B.1 local durable correction-intent database/server foundation, including UUID-only correction apply for reload-safe retry; correction UI remains out of scope.
 - [x] Deploy `20260929170000_product_field_correction_intents_v1.sql`; migration ledger is user-confirmed synchronized through version `20260929170000`. Treat this applied migration as immutable; future database changes require a new additive migration.
-- [ ] Verify correction intent issuance/recovery and correction replay, conflict, role, and concurrency behavior in isolated staging with dedicated authenticated roles and synthetic fixtures. No production mutation testing; static migration-contract tests are not runtime verification.
 - [x] Configure `IPOS_COMMIT_SECRET` only in a trusted server/operator secret store and perform the approved production commit after verifying the preflight.
 - [x] Independently verify products, row links, histories, findings, provenance, and unchanged raw JSON after the production commit.
 - [x] Use database advisory lock `(734921, 2)` in the deployed Phase 3B.1A product correction/import reconciliation functions.

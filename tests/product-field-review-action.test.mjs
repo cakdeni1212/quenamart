@@ -328,7 +328,7 @@ test('trusted action maps stale/conflict errors safely and catches thrown profil
 });
 
 test('active finding and human review remain separate; ordering matches the deployed RPC', () => {
-  assert.match(page, /Verifikasi tidak menutup temuan sumber/);
+  assert.match(page, /Cek petugas tidak menghapus temuan iPos/);
   assert.match(readModel, /\.order\("reviewed_at", \{ ascending: false \}\)\s*\.order\("created_at", \{ ascending: false \}\)\s*\.order\("id", \{ ascending: false \}\)/);
   assert.match(foundation, /order by r\.reviewed_at desc, r\.created_at desc, r\.id desc limit 1/);
 });

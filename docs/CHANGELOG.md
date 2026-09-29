@@ -84,3 +84,10 @@
 - Refactored the compatible correction RPC and UUID-only apply RPC to use one private correction implementation. Corrected values and reasons stay inside PostgreSQL during retry; metadata recovery does not return them.
 - Added minimal authenticated server actions for intent issuance, safe metadata recovery, and UUID-only apply. No correction form UI was added.
 - Added static SQL-contract and input-canonicalization tests. Authenticated correction-intent mutation and PostgreSQL concurrency runtime verification have NOT been performed; all mutation verification remains pending in isolated staging with dedicated role sessions and synthetic fixtures. No production mutation tests should be run.
+
+## 2026-09-29 — Product field correction UI (Phase 3B.1B-2B.2)
+
+- Added correction controls to `/audit-produk/[productId]` for supported fields only while the exact field is in `SEDANG_DICEK`. Barcode alias and iPos-source replacement are presented as separate actions; stock and minimum stock remain informational.
+- OWNER/ADMIN can correct barcode, rack, HPP, and selling price. GUDANG can correct barcode and rack only; the existing server read model continues to omit financial source data for GUDANG. KASIR remains denied by the audit route/actions and database RPCs.
+- The client keeps only the opaque database-issued correction intent UUID in local storage. Values and reasons are cleared from form state after intent issuance and stay in the private database intent; retries call the UUID-only apply action. Confirmed success/conflict consumes the stored UUID, and stale source errors require refreshing the audit.
+- Added Indonesian currency parsing/formatting for HPP and selling price, a confirmation summary, barcode conflict messaging, and UI/contract tests. No database migration was created. Authenticated correction runtime and concurrency verification remains pending in isolated staging; the UI is not production mutation/runtime verified.
