@@ -74,6 +74,13 @@
 ## 2026-09-29 — Review retry/idempotency hardening (Phase 3B.1B-2A)
 
 - Review forms now use database-issued, actor- and canonical-payload-bound intent UUIDs. The browser persists only the opaque ID so the same pending/unknown intent can be recovered after reload; confirmed success consumes it, and a later action receives a new ID.
-- Added local, forward-only migration `20260929150000_product_field_review_notes_idempotency_v1.sql` so review RPC retries compare the same trimmed evidence note stored by the RPC. This migration is **LOCAL / NOT DEPLOYED**.
-- Added local, forward-only migration `20260929160000_product_field_review_intents_v1.sql` for the private intent registry and issue/read RPCs. Exact completed retries reach database replay before freshness checks; fresh intents are checked against current source before issuing and again transactionally by the review RPC. This migration is **LOCAL / NOT DEPLOYED**.
+- Added forward-only migration `20260929150000_product_field_review_notes_idempotency_v1.sql` so review RPC retries compare the same trimmed evidence note stored by the RPC. This migration is deployed.
+- Added forward-only migration `20260929160000_product_field_review_intents_v1.sql` for the private intent registry and issue/read RPCs. Exact completed retries reach database replay before freshness checks; fresh intents are checked against current source before issuing and again transactionally by the review RPC. This migration is deployed.
 - Added safe typed error handling and deterministic latest-review ordering. Phase 3B.1B-2A has not been production runtime verified; authenticated review mutation verification remains pending in isolated staging.
+
+## 2026-09-29 — Durable correction intent foundation (Phase 3B.1B-2B.1)
+
+- Added forward-only migration `20260929170000_product_field_correction_intents_v1.sql`. It adds actor-bound correction intents, safe issue/recovery RPCs, and a UUID-only apply RPC. The existing completed correction request ledger remains the exact-result replay authority; persisted `BARCODE_CONFLICT` results complete their intent. Deployment is **LEDGER CONFIRMED**; remote structural verification was unavailable. The applied migration is immutable and future database changes require a new additive migration.
+- Refactored the compatible correction RPC and UUID-only apply RPC to use one private correction implementation. Corrected values and reasons stay inside PostgreSQL during retry; metadata recovery does not return them.
+- Added minimal authenticated server actions for intent issuance, safe metadata recovery, and UUID-only apply. No correction form UI was added.
+- Added static SQL-contract and input-canonicalization tests. Authenticated correction-intent mutation and PostgreSQL concurrency runtime verification have NOT been performed; all mutation verification remains pending in isolated staging with dedicated role sessions and synthetic fixtures. No production mutation tests should be run.
