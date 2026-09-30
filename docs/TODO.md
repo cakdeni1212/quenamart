@@ -34,6 +34,13 @@
 
 ## Product modules
 
+- [ ] Review local Phase 3C.1A migration `20260929180000_stock_foundation_v1.sql` against the deployed catalog before any production dry-run. It passed synthetic PostgreSQL 15 local staging runtime verification; it is not deployed to production.
+- [x] Run the Phase 3C.1A isolated PostgreSQL 15 staging runtime matrix for bootstrap, role access, barcode resolution, count/recount/post, retry, stale baseline, negative stock, observation-only imports, reversal-group reconciliation, and immutability. The test transaction rolled back; production was not contacted.
+- [ ] Run multi-session PostgreSQL concurrency tests for competing posts, movements, reversals, reconciliation, and import observations before production deployment.
+- [ ] Add and validate trusted iPos source chronology (`source_snapshot_at` or monotonic source sequence) before enabling any automatic projection baseline acceptance. Upload time and batch UUID are not chronology; current imports record observations only.
+- [ ] Implement later manual stock-operation draft documents and their edit/cancel workflow before exposing manual in/out operations; posted changes must use immutable movements and reversals.
+- [ ] Implement the native Stock workspace and stock-opname UI; no Stock UI exists yet.
+
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
 - Implement POS carts, parked transactions, payments, member lookup, receipts, and stock consistency.
 - Implement loyalty rules, member records, reward catalog, redemption, and point ledger.

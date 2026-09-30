@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-30 — Stock database foundation (Phase 3C.1A; local staging verified)
+
+- Added local migration `20260929180000_stock_foundation_v1.sql` for a separate transitional stock balance projection, provenance-aware iPos baseline observations, immutable Quena movement ledger, explicit source reconciliation, stock-opname sessions/count history, and private operation idempotency requests. It is applied only to isolated local PostgreSQL staging and is NOT deployed to production.
+- `product_inventory` remains the normalized iPos snapshot. Stock operations update only the projection and immutable movement/event records. Daily iPos sales imports remain reporting-only; no stock UI or importer behavior was added.
+- Revised the local proposal after adversarial review: initial bootstrap now validates normalized `STOK` against the stored inventory quantity; ordinary imports only record observations (no upload-time/UUID chronology); barcode resolution groups matching rows by distinct product; and reversal pairs reconcile atomically by net delta.
+- Documented the v1 no-negative-effective-stock rule, strictly increasing stale/count revisions, and deterministic FULL scope captured at session creation. Migration 180000 and forward fix 171000 passed the synthetic local PostgreSQL 15 runtime matrix; its transaction rolled back. Bootstrap verified 8/8 projection rows matched source and baseline values.
+- Runtime coverage includes authenticated OWNER/GUDANG/KASIR behavior, barcode resolution, count/recount/post, exact retry, stale-baseline handling, negative-stock rejection, observation-only imports, reversal-group reconciliation, and immutability. Multi-session concurrency testing remains pending. Production was not contacted, and no native Stock UI exists yet.
+
 ## 2026-09-28 — iPos Phase 2B commit engine (executed and verified)
 
 - Added the transactional commit migration, separate normalization lifecycle/proposal tables, raw-row link guard, versioned idempotency, global advisory serialization, and service-role direct-write revocations for normalized targets. The migration was applied and the 5,103-row production commit was independently verified complete.
