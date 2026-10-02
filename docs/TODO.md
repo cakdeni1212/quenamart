@@ -34,10 +34,13 @@
 
 ## Product modules
 
-- [ ] Review local Phase 3C.1A migration `20260929180000_stock_foundation_v1.sql` against the deployed catalog before any production dry-run. It passed synthetic PostgreSQL 15 local staging runtime verification; it is not deployed to production.
+- [x] Complete the read-only production compatibility gate for `20260929180000_stock_foundation_v1.sql`: 25/25 components passed, including 5,103/5,103 eligible bootstrap rows and zero stock-object collisions.
 - [x] Rerun isolated PostgreSQL 15 prepare/apply/single-session runtime verification after the local 180000 change requiring `expected_revision` for `RECORD_COUNT`. User-confirmed staging result: all runtime assertions passed and rolled back; production remains untouched.
 - [x] Run `tests/staging/run-stock-concurrency-matrix.sh` against guarded local PostgreSQL 15 staging. A/B/E/F/D/G passed with observed real lock overlap. C remains deferred because no generic manual movement/Sale RPC exists; H remains deferred because public multi-product operations sort product IDs internally and expose no reverse-order control. The runner commits synthetic operations, restores stock effects, and retains append-only audit rows.
-- [ ] Complete controlled pre-deployment review for local migrations 171000 and 180000. Production migration history remains through 170000; no production mutation tests were performed. Do not deploy until migration review and deployment planning are approved.
+- [x] Deploy and ledger-confirm forward fix `20260929171000_product_field_correction_intent_ambiguity_fix_v1.sql`; its read-only post-deployment verification passed.
+- [x] Manually execute and ledger-confirm `20260929180000_stock_foundation_v1.sql`; its 34-component read-only production post-deployment checker passed with `overall_gate=PASS`, zero blocking failures, and zero review gates.
+- [x] Verify production bootstrap totals: 5,103 projection rows, 5,103 inventory rows, 5,103 bootstrap events, and 4,527 active barcodes; no unexpected movements, reconciliations, opname activity, or operation requests.
+- [ ] Production stock mutation tests remain prohibited; runtime mutation and concurrency verification is staging-only.
 - [ ] Add and validate trusted iPos source chronology (`source_snapshot_at` or monotonic source sequence) before enabling any automatic projection baseline acceptance. Upload time and batch UUID are not chronology; current imports record observations only.
 - [ ] Implement later manual stock-operation draft documents and their edit/cancel workflow before exposing manual in/out operations; posted changes must use immutable movements and reversals.
 - [ ] Implement the native Stock workspace and stock-opname UI; no Stock UI exists yet.

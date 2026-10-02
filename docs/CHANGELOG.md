@@ -1,15 +1,23 @@
 # Changelog
 
+## 2026-10-02 — Phase 3C.1A Stock Foundation deployed and verified
+
+- Deployed and ledger-confirmed the forward-only correction-intent ambiguity fix `20260929171000`; read-only post-deployment checks passed for the ledger, function definitions/signatures, overloads, and security/grants.
+- Deployed and ledger-confirmed stock foundation `20260929180000`. Its 34-component read-only production post-deployment checker passed: `overall_gate=PASS`, `blocking_failures=0`, `review_gates=0`.
+- Production verification confirmed 5,103/5,103 stock projection rows, 5,103 inventory rows, 5,103 bootstrap events, and 4,527 active barcodes, with no unexpected movement, reconciliation, opname, or stock-operation request rows.
+- Local PostgreSQL 15 single-session and multi-session matrices passed. Concurrency scenarios A/B/D/E/F/G passed with real lock overlap; C (no generic manual movement/Sale RPC) and H (no public reverse-order multi-product call path) remain deferred. No production mutation tests were performed.
+- Phase 3C.1A is complete. No native Stock UI exists yet; no production mutation tests were performed.
+
 ## 2026-09-30 — Stock database foundation (Phase 3C.1A; local staging verified)
 
-- Added local migration `20260929180000_stock_foundation_v1.sql` for a separate transitional stock balance projection, provenance-aware iPos baseline observations, immutable Quena movement ledger, explicit source reconciliation, stock-opname sessions/count history, and private operation idempotency requests. It is applied only to isolated local PostgreSQL staging and is NOT deployed to production.
+- Added migration `20260929180000_stock_foundation_v1.sql` for a separate transitional stock balance projection, provenance-aware iPos baseline observations, immutable Quena movement ledger, explicit source reconciliation, stock-opname sessions/count history, and private operation idempotency requests. At the time of this entry it had only been applied to isolated local PostgreSQL staging; its current production status is recorded above.
 - `product_inventory` remains the normalized iPos snapshot. Stock operations update only the projection and immutable movement/event records. Daily iPos sales imports remain reporting-only; no stock UI or importer behavior was added.
 - Revised the local proposal after adversarial review: initial bootstrap now validates normalized `STOK` against the stored inventory quantity; ordinary imports only record observations (no upload-time/UUID chronology); barcode resolution groups matching rows by distinct product; and reversal pairs reconcile atomically by net delta.
 - Documented the v1 no-negative-effective-stock rule, strictly increasing stale/count revisions, and deterministic FULL scope captured at session creation. Migration 180000 and forward fix 171000 passed the synthetic local PostgreSQL 15 runtime matrix; its transaction rolled back. Bootstrap verified 8/8 projection rows matched source and baseline values.
 - Runtime coverage includes authenticated OWNER/GUDANG/KASIR behavior, barcode resolution, count/recount/post, exact retry, stale-baseline handling, negative-stock rejection, observation-only imports, reversal-group reconciliation, and immutability. Bootstrap verified 8/8 projection rows against source and baseline. The single-session matrix rolled back; no native Stock UI exists yet.
-- Updated local/unreleased migration 180000 so every `RECORD_COUNT` intent requires and binds caller-observed `expected_revision`. A stale client revision returns replayable `STALE_BASELINE`/`ITEM_REVISION_MISMATCH` without overwriting the count or consuming a revision; projection-baseline staleness remains distinct. The revised migration passed the user-run PostgreSQL 15 local staging single-session matrix.
+- Updated migration 180000 so every `RECORD_COUNT` intent requires and binds caller-observed `expected_revision`. A stale client revision returns replayable `STALE_BASELINE`/`ITEM_REVISION_MISMATCH` without overwriting the count or consuming a revision; projection-baseline staleness remains distinct. The revised migration passed the user-run PostgreSQL 15 local staging single-session matrix.
 - The local-only multi-session harness passed A/B/E/F/D/G with separate psql sessions and observed database lock overlap. C is deferred because 180000 exposes no generic manual movement/Sale RPC. H is deferred because public multi-product paths sort product IDs internally and expose no caller-controlled reverse lock order. The runner commits local synthetic operations, neutralizes stock effects, and retains append-only audit rows. These staging results do not constitute production deployment or production mutation testing.
-- Production migration history remains through 170000. Forward fix 171000 and stock foundation 180000 are NOT deployed to production. Production was not contacted; controlled pre-deployment review is the next gate.
+- At the time of this 2026-09-30 entry, production migration history remained through 170000 and neither 171000 nor 180000 was deployed. Current status is recorded in the 2026-10-02 entry above.
 
 ## 2026-09-28 — iPos Phase 2B commit engine (executed and verified)
 

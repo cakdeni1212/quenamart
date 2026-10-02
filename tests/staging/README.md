@@ -72,7 +72,10 @@ the staging database; do not rerun a migration manually or alter objects until
 the database contents are reviewed.
 
 The Phase 3C.1 single-session and multi-session matrices passed on local
-PostgreSQL 15. Migrations 171000 and 180000 remain local and are NOT deployed to
-production; production migration history remains through 170000. No production
-mutation tests were performed. Controlled pre-deployment review is the next
-gate. These results do not mean a native Stock UI exists.
+PostgreSQL 15. Migrations 171000 and 180000 are deployed and ledger-confirmed in
+production. Migration 180000's 34-component read-only post-deployment checker
+passed with no blocking failures or review gates; it verified 5,103 projection
+rows, 5,103 inventory rows, 5,103 bootstrap events, and 4,527 active barcodes.
+No production stock mutation tests were performed. Scenarios C and H remain
+deferred for the API and lock-order reasons above. These staging results do not
+mean a native Stock UI exists.
