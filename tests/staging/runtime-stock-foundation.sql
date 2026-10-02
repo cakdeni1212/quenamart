@@ -32,6 +32,7 @@ DECLARE
   v_result jsonb;
   v_session uuid;
   v_count integer;
+  v_rejected boolean;
   v_resolution text;
   v_resolved_product uuid;
 BEGIN
@@ -74,13 +75,51 @@ BEGIN
   v_result := public.apply_stock_operation_intent(v_request);
   v_session := (v_result->>'sessionId')::uuid;
 
-  -- Physical zero is recorded, then recount records 17; revisions remain 1,2.
+  -- RECORD_COUNT binds the item revision observed by the caller.
+  v_rejected := false;
+  BEGIN
+    PERFORM public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
+      'session_id', v_session, 'product_id', v_product, 'physical_quantity', 3, 'barcode_id', null));
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'RECORD_COUNT accepted a missing expected_revision'; END IF;
+  v_rejected := false;
+  BEGIN
+    PERFORM public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
+      'session_id', v_session, 'product_id', v_product, 'physical_quantity', 3,
+      'expected_revision', 0.5, 'barcode_id', null));
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'RECORD_COUNT accepted a fractional expected_revision'; END IF;
+
+  -- Physical zero is recorded at revision 0. A second logical client with the
+  -- same observed revision is rejected after the first advances the item.
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
-    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 0,
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 0, 'expected_revision', 0,
     'barcode_id', null));
   PERFORM public.apply_stock_operation_intent(v_request);
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
-    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 17,
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 99, 'expected_revision', 0,
+    'barcode_id', null));
+  v_result := public.apply_stock_operation_intent(v_request);
+  IF v_result->>'code' <> 'STALE_BASELINE'
+     OR v_result->>'reason' <> 'ITEM_REVISION_MISMATCH'
+     OR v_result->>'expectedRevision' <> '0' OR v_result->>'currentRevision' <> '1'
+     OR (SELECT physical_quantity FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product) <> 0
+     OR (SELECT revision_no FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product) <> 1
+     OR EXISTS (SELECT 1 FROM public.stock_opname_count_events WHERE request_id = v_request) THEN
+    RAISE EXCEPTION 'Stale client revision overwrote or mutated the current count';
+  END IF;
+  IF public.apply_stock_operation_intent(v_request) IS DISTINCT FROM v_result
+     OR (SELECT physical_quantity FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product) <> 0 THEN
+    RAISE EXCEPTION 'Exact stale client-revision retry was not idempotent';
+  END IF;
+
+  -- Refresh to the currently observed revision and record the valid recount.
+  v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 17, 'expected_revision', 1,
     'barcode_id', null));
   v_result := public.apply_stock_operation_intent(v_request);
   IF v_result->>'variance' <> '-3' OR v_result->>'revision' <> '2' THEN
@@ -131,7 +170,7 @@ BEGIN
   v_session := (public.apply_stock_operation_intent(v_request)->>'sessionId')::uuid;
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
     'session_id', v_session, 'product_id', (SELECT id FROM public.products WHERE sku = 'STG-STALE'),
-    'physical_quantity', 0, 'barcode_id', null));
+    'physical_quantity', 0, 'expected_revision', 0, 'barcode_id', null));
   PERFORM public.apply_stock_operation_intent(v_request);
   v_request := public.issue_stock_operation_intent('SUBMIT_REVIEW', jsonb_build_object('session_id', v_session));
   PERFORM public.apply_stock_operation_intent(v_request);
@@ -262,7 +301,7 @@ BEGIN
     'outlet_id', v_outlet, 'scope_type', 'PARTIAL', 'product_ids', jsonb_build_array(v_product), 'note', 'Stale baseline test'));
   v_session := (public.apply_stock_operation_intent(v_request)->>'sessionId')::uuid;
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
-    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 9, 'barcode_id', null));
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 9, 'expected_revision', 0, 'barcode_id', null));
   PERFORM public.apply_stock_operation_intent(v_request);
   PERFORM public.stock_apply_balance_delta(v_product, v_outlet, 1);
   v_request := public.issue_stock_operation_intent('SUBMIT_REVIEW', jsonb_build_object('session_id', v_session));
@@ -294,9 +333,13 @@ BEGIN
   -- Two distinct stale count requests serialize on the item and each consume
   -- one revision. Replaying either request must not consume another revision.
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
-    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 8, 'barcode_id', null));
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 8,
+    'expected_revision', (SELECT revision_no FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product),
+    'barcode_id', null));
   v_result := public.apply_stock_operation_intent(v_request);
-  IF v_result->>'code' <> 'STALE_BASELINE' THEN RAISE EXCEPTION 'Stale count was not rejected'; END IF;
+  IF v_result->>'code' <> 'STALE_BASELINE' OR v_result->>'reason' <> 'PROJECTION_BASELINE_CHANGED' THEN
+    RAISE EXCEPTION 'Stale projection baseline was not distinguished and rejected';
+  END IF;
   SELECT revision_no INTO STRICT v_stale_revision FROM public.stock_opname_count_events
   WHERE request_id = v_request AND event_type = 'STALE_BASELINE';
   IF public.apply_stock_operation_intent(v_request) IS DISTINCT FROM v_result
@@ -304,7 +347,9 @@ BEGIN
     RAISE EXCEPTION 'Exact stale-count retry consumed another revision or event';
   END IF;
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
-    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 7, 'barcode_id', null));
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 7,
+    'expected_revision', (SELECT revision_no FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product),
+    'barcode_id', null));
   v_result := public.apply_stock_operation_intent(v_request);
   IF v_result->>'code' <> 'STALE_BASELINE' THEN RAISE EXCEPTION 'Second stale count was not rejected'; END IF;
   SELECT revision_no INTO STRICT v_second_stale_revision FROM public.stock_opname_count_events
@@ -319,7 +364,9 @@ BEGIN
   v_request := public.issue_stock_operation_intent('REBASE_ITEM', jsonb_build_object('session_id', v_session, 'product_id', v_product));
   PERFORM public.apply_stock_operation_intent(v_request);
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
-    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 11, 'barcode_id', null));
+    'session_id', v_session, 'product_id', v_product, 'physical_quantity', 11,
+    'expected_revision', (SELECT revision_no FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product),
+    'barcode_id', null));
   v_result := public.apply_stock_operation_intent(v_request);
   IF v_result->>'revision' IS NULL OR (v_result->>'revision')::integer <= v_second_stale_revision THEN
     RAISE EXCEPTION 'Next valid recount did not advance beyond both stale revisions';

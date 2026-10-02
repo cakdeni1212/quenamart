@@ -866,6 +866,8 @@ declare
   v_product uuid;
   v_outlet uuid;
   v_qty numeric;
+  v_expected_revision integer;
+  v_expected_revision_numeric numeric;
   v_note text;
   v_products uuid[];
 begin
@@ -923,12 +925,23 @@ begin
       if jsonb_typeof(p_payload->'physical_quantity') is distinct from 'number' then
         raise exception using errcode = '22023', message = 'Physical quantity must be numeric';
       end if;
+      if jsonb_typeof(p_payload->'expected_revision') is distinct from 'number' then
+        raise exception using errcode = '22023', message = 'Expected item revision is required';
+      end if;
+      v_expected_revision_numeric := (p_payload->>'expected_revision')::numeric;
+      if v_expected_revision_numeric < 0
+        or v_expected_revision_numeric > 2147483647
+        or v_expected_revision_numeric <> trunc(v_expected_revision_numeric) then
+        raise exception using errcode = '22023', message = 'Expected item revision must be a nonnegative integer';
+      end if;
+      v_expected_revision := v_expected_revision_numeric::integer;
       v_qty := (p_payload->>'physical_quantity')::numeric;
       if v_qty < 0 or v_qty >= 100000000000 or v_qty <> trunc(v_qty, 3) then
         raise exception using errcode = '22023', message = 'Physical quantity is outside the allowed range or precision';
       end if;
       v_payload := jsonb_build_object('session_id', v_session, 'product_id', v_product,
-        'physical_quantity', to_jsonb(trim_scale(v_qty)), 'barcode_id', nullif(p_payload->>'barcode_id', '')::uuid);
+        'physical_quantity', to_jsonb(trim_scale(v_qty)), 'barcode_id', nullif(p_payload->>'barcode_id', '')::uuid,
+        'expected_revision', v_expected_revision);
     elsif p_operation_key = 'REVIEW_EXCEPTION' then
       v_note := nullif(btrim(p_payload->>'reason'), '');
       if v_note is null then raise exception using errcode = '22023', message = 'Exception reason is required'; end if;
@@ -1135,6 +1148,7 @@ declare
   v_inserted_count integer;
   v_has_reversal boolean;
   v_revision_no integer;
+  v_expected_revision integer;
 begin
   if v_actor is null then raise exception using errcode = '42501', message = 'Authentication required'; end if;
   v_role := public.current_active_user_role();
@@ -1219,6 +1233,15 @@ begin
     select * into v_item from public.stock_opname_items i
     where i.session_id = v_session_id and i.product_id = v_product_id for update;
     if not found then raise exception using errcode = '22023', message = 'Product is outside this opname scope'; end if;
+    v_expected_revision := (v_payload->>'expected_revision')::integer;
+    if v_item.revision_no <> v_expected_revision then
+      v_result := jsonb_build_object('ok', false, 'code', 'STALE_BASELINE',
+        'reason', 'ITEM_REVISION_MISMATCH', 'expectedRevision', v_expected_revision,
+        'currentRevision', v_item.revision_no, 'recountRequired', true);
+      update public.stock_operation_requests set state = 'STALE', result = v_result, completed_at = now()
+      where request_id = v_request;
+      return v_result;
+    end if;
     select * into v_projection from public.stock_balance_projection p
     where p.product_id = v_product_id and p.outlet_id = v_item.outlet_id for update;
     if not found or v_item.baseline_balance_version is null
@@ -1233,7 +1256,8 @@ begin
       ) values (v_item.id, v_request, 'STALE_BASELINE', v_revision_no,
         v_item.baseline_quantity, v_item.baseline_balance_version, v_qty,
         nullif(v_payload->>'barcode_id', '')::uuid, v_actor, 'Baseline changed; recount required');
-      v_result := jsonb_build_object('ok', false, 'code', 'STALE_BASELINE', 'recountRequired', true);
+      v_result := jsonb_build_object('ok', false, 'code', 'STALE_BASELINE',
+        'reason', 'PROJECTION_BASELINE_CHANGED', 'recountRequired', true);
       update public.stock_operation_requests set state = 'STALE', result = v_result, completed_at = now()
       where request_id = v_request;
       return v_result;

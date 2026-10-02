@@ -35,8 +35,9 @@
 ## Product modules
 
 - [ ] Review local Phase 3C.1A migration `20260929180000_stock_foundation_v1.sql` against the deployed catalog before any production dry-run. It passed synthetic PostgreSQL 15 local staging runtime verification; it is not deployed to production.
-- [x] Run the Phase 3C.1A isolated PostgreSQL 15 staging runtime matrix for bootstrap, role access, barcode resolution, count/recount/post, retry, stale baseline, negative stock, observation-only imports, reversal-group reconciliation, and immutability. The test transaction rolled back; production was not contacted.
-- [ ] Run multi-session PostgreSQL concurrency tests for competing posts, movements, reversals, reconciliation, and import observations before production deployment.
+- [x] Rerun isolated PostgreSQL 15 prepare/apply/single-session runtime verification after the local 180000 change requiring `expected_revision` for `RECORD_COUNT`. User-confirmed staging result: all runtime assertions passed and rolled back; production remains untouched.
+- [x] Run `tests/staging/run-stock-concurrency-matrix.sh` against guarded local PostgreSQL 15 staging. A/B/E/F/D/G passed with observed real lock overlap. C remains deferred because no generic manual movement/Sale RPC exists; H remains deferred because public multi-product operations sort product IDs internally and expose no reverse-order control. The runner commits synthetic operations, restores stock effects, and retains append-only audit rows.
+- [ ] Complete controlled pre-deployment review for local migrations 171000 and 180000. Production migration history remains through 170000; no production mutation tests were performed. Do not deploy until migration review and deployment planning are approved.
 - [ ] Add and validate trusted iPos source chronology (`source_snapshot_at` or monotonic source sequence) before enabling any automatic projection baseline acceptance. Upload time and batch UUID are not chronology; current imports record observations only.
 - [ ] Implement later manual stock-operation draft documents and their edit/cancel workflow before exposing manual in/out operations; posted changes must use immutable movements and reversals.
 - [ ] Implement the native Stock workspace and stock-opname UI; no Stock UI exists yet.

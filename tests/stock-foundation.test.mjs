@@ -14,6 +14,11 @@ const stagingRuntime = readFileSync(new URL('./staging/runtime-stock-foundation.
 const stagingBootstrap = readFileSync(new URL('./staging/bootstrap-supabase-compat.sql', import.meta.url), 'utf8');
 const stagingReset = readFileSync(new URL('./staging/reset-stock-staging.sql', import.meta.url), 'utf8');
 const stagingResetRunner = readFileSync(new URL('./staging/reset-stock-staging.sh', import.meta.url), 'utf8');
+const concurrencyRunner = readFileSync(new URL('./staging/run-stock-concurrency-matrix.sh', import.meta.url), 'utf8');
+const concurrencyHeldWorker = readFileSync(new URL('./staging/stock-concurrency-held-worker.sql', import.meta.url), 'utf8');
+const concurrencyWaiter = readFileSync(new URL('./staging/stock-concurrency-waiter.sql', import.meta.url), 'utf8');
+const concurrencyImportHolder = readFileSync(new URL('./staging/stock-concurrency-import-holder.sql', import.meta.url), 'utf8');
+const concurrencyImportPrep = readFileSync(new URL('./staging/prepare-stock-concurrency-import.sql', import.meta.url), 'utf8');
 const commitPayloadBuilder = readFileSync(new URL('../src/lib/ipos/commit-payload.ts', import.meta.url), 'utf8');
 
 function body(name) {
@@ -154,6 +159,100 @@ test('stock operation requests are private, actor-bound, payload-bound, and seri
   assert.match(body('read_stock_operation_intent'), /request_id = p_request_id and r\.actor_id = v_actor/);
   assert.match(body('read_stock_operation_intent'), /jsonb_build_object\('available', true, 'requestId', v_request\.request_id,[\s\S]*'operation',[\s\S]*'state'/);
   assert.doesNotMatch(body('read_stock_operation_intent'), /request_payload|payload_hash|corrected_value|hpp/i);
+});
+
+test('RECORD_COUNT requires and binds a canonical expected item revision', () => {
+  const issue = body('issue_stock_operation_intent');
+  const apply = body('apply_stock_operation_intent');
+  const recordCountIssue = issue.slice(issue.indexOf("if p_operation_key = 'RECORD_COUNT'"), issue.indexOf("elsif p_operation_key = 'REVIEW_EXCEPTION'"));
+  const recordCountApply = apply.slice(apply.indexOf("elsif v_req.operation_key = 'RECORD_COUNT'"), apply.indexOf("elsif v_req.operation_key = 'REBASE_ITEM'"));
+  assert.match(recordCountIssue, /jsonb_typeof\(p_payload->'expected_revision'\) is distinct from 'number'/);
+  assert.match(recordCountIssue, /v_expected_revision_numeric <> trunc\(v_expected_revision_numeric\)/);
+  assert.match(recordCountIssue, /v_expected_revision_numeric < 0/);
+  assert.match(recordCountIssue, /'expected_revision', v_expected_revision/);
+  assert.match(recordCountApply, /select \* into v_item from public\.stock_opname_items i[\s\S]*?for update[\s\S]*?v_item\.revision_no <> v_expected_revision/);
+  assert.match(recordCountApply, /'reason', 'ITEM_REVISION_MISMATCH'[\s\S]*?'expectedRevision', v_expected_revision[\s\S]*?'currentRevision', v_item\.revision_no/);
+  assert.match(recordCountApply, /update public\.stock_operation_requests set state = 'STALE', result = v_result[\s\S]*?return v_result/);
+  assert.doesNotMatch(recordCountApply.slice(0, recordCountApply.indexOf("if v_item.revision_no <> v_expected_revision")), /stock_balance_projection/,
+    'the locked item revision check precedes baseline validation');
+  const mismatchBranch = recordCountApply.slice(recordCountApply.indexOf("if v_item.revision_no <> v_expected_revision"), recordCountApply.indexOf('select * into v_projection'));
+  assert.doesNotMatch(mismatchBranch, /update public\.stock_opname_items|insert into public\.stock_opname_count_events/,
+    'a stale client attempt changes neither item state nor count-event history');
+  assert.match(stagingRuntime, /accepted a missing expected_revision/);
+  assert.match(stagingRuntime, /Stale client revision overwrote or mutated the current count/);
+  assert.match(stagingRuntime, /Exact stale client-revision retry was not idempotent/);
+});
+
+test('multi-session harness is local-only, bounded, genuinely concurrent, and explicit about deferred APIs', () => {
+  assert.match(concurrencyRunner, /STAGING_HOST|guard_local_target/);
+  assert.match(concurrencyRunner, /STAGING_DATABASE|assert_local_staging_marker/);
+  assert.match(concurrencyRunner, /20260929171000/);
+  assert.match(concurrencyRunner, /20260929180000/);
+  assert.match(concurrencyRunner, /PGAPPNAME=/);
+  assert.match(concurrencyRunner, /psql_local[\s\S]*&/);
+  assert.match(concurrencyRunner, /pg_stat_activity[\s\S]*pg_blocking_pids[\s\S]*JOIN pg_stat_activity h ON h\.pid = blocked\.pid WHERE a\.application_name = '\$app' AND a\.wait_event_type = 'Lock' AND h\.application_name = '\$holder_app'/,
+    'the observed blocker must be this scenario\'s lock-holding psql process, not unrelated database activity');
+  assert.match(concurrencyRunner, /for \(\(i=0; i<200; i\+\+\)\)/);
+  assert.match(concurrencyRunner, /sleep 40[\s\S]*kill -TERM/);
+  assert.match(concurrencyRunner, /for active_pid in \$\{ACTIVE_PIDS\[\*\]-\}/);
+  assert.match(concurrencyRunner, /WATCHDOG_PID[\s\S]*kill -TERM "\$WATCHDOG_PID"/);
+  assert.match(concurrencyHeldWorker, /statement_timeout = '35s'[\s\S]*lock_timeout = '25s'/);
+  assert.match(concurrencyWaiter, /statement_timeout = '35s'[\s\S]*lock_timeout = '25s'/);
+  assert.match(concurrencyHeldWorker, /STOCK_BARRIER_COMMIT[\s\S]*kill -TERM "\$PPID"/);
+  assert.match(concurrencyImportHolder, /STOCK_BARRIER_COMMIT[\s\S]*kill -TERM "\$PPID"/);
+  assert.match(concurrencyHeldWorker, /apply_stock_operation_intent\(:'request_id'::uuid\)/);
+  assert.equal((concurrencyRunner.match(/'expected_revision', \$REVISION/g) ?? []).length, 2,
+    'both logical contenders use the same observed initial revision');
+  assert.equal((concurrencyRunner.match(/run_race 'A-record-count'/g) ?? []).length, 1,
+    'the stale contenders race exactly once before replay and refreshed recount checks');
+  assert.match(concurrencyRunner, /cleanup_tagged_data/);
+  assert.match(concurrencyRunner, /POST_REPLAY=.*apply_intent.*REQ_A/);
+  assert.match(concurrencyRunner, /exact posting retry created a duplicate movement/);
+  assert.match(concurrencyRunner, /REVERSAL_REPLAY=.*apply_intent.*REQ_A/);
+  const reversalReplayBlock = concurrencyRunner.slice(
+    concurrencyRunner.indexOf('REVERSAL_REPLAY_MATCH='),
+    concurrencyRunner.indexOf("printf 'PASS: E")
+  );
+  assert.match(reversalReplayBlock, /psql_local -Atq[\s\S]*-v replay_result=\"\$REVERSAL_REPLAY\"[\s\S]*<<'SQL'/,
+    'replay JSON is passed through psql stdin so psql performs literal-safe variable substitution');
+  assert.match(reversalReplayBlock, /:'replay_result'::jsonb = q\.result/,
+    'reversal retry compares JSONB semantically with its stored request result');
+  assert.match(reversalReplayBlock, /:'request_id'::uuid/);
+  assert.match(reversalReplayBlock, /:'original_movement_id'/);
+  assert.doesNotMatch(reversalReplayBlock, /-c\s+"[\s\S]*:'replay_result'/,
+    'psql variables must not be embedded in a -c SQL string');
+  assert.match(reversalReplayBlock, /E_VERSION_AFTER_RACE[\s\S]*E_QUANTITY_AFTER_RACE/);
+  assert.match(reversalReplayBlock, /exact reversal retry changed projection quantity or version/);
+  assert.match(reversalReplayBlock, /count\(\*\).*reverses_movement_id = '\$MOVEMENT'::uuid/);
+  assert.doesNotMatch(concurrencyRunner, /REVERSAL_REPLAY.*REVERSAL_ID/,
+    'reversal replay comparison must use the stored result, not confuse the new reversal row id with its reversesMovementId');
+  assert.match(concurrencyRunner, /status = 'REVIEW'[\s\S]*?movement_type = 'OPNAME_ADJUSTMENT'[\s\S]*?Scenario B target session already has an OPNAME_ADJUSTMENT/);
+  assert.match(concurrencyRunner, /state = 'PENDING'[\s\S]*?q\.request_payload->>'session_id' = '\$CURRENT_SESSION'[\s\S]*?request_id IN \('\$REQ_A'::uuid, '\$REQ_B'::uuid\) AND q\.state = 'COMPLETED'/,
+    'Scenario B state assertions are scoped to the current session and the current race request IDs');
+  assert.match(concurrencyRunner, /CURRENT_SCENARIO='B competing POST_SESSION'/);
+  assert.ok(concurrencyRunner.indexOf("run_race 'E-reversal'") < concurrencyRunner.indexOf("run_race 'F-reconciliation'")
+    && concurrencyRunner.indexOf("run_race 'F-reconciliation'") < concurrencyRunner.indexOf("run_race 'D-negative-stock'"),
+  'D is deliberately later because E/F assert the B movement returns to baseline before D creates its separate stock state');
+  assert.match(concurrencyRunner, /note LIKE 'CC:\$RUN_ID:%' AND status IN \('COUNTING', 'REVIEW'\)/);
+  assert.match(concurrencyRunner, /unreconciled_movement_delta = 0 AND effective_quantity = baseline_quantity/);
+  assert.match(concurrencyRunner, /DEFERRED C: no generic manual movement\/SALE RPC/);
+  assert.match(concurrencyRunner, /DEFERRED H: public multi-product stock paths internally sort product IDs/);
+  assert.match(concurrencyImportPrep, /request_ipos_import/);
+  assert.match(concurrencyImportPrep, /claim_ipos_import_request/);
+  assert.match(concurrencyImportPrep, /complete_ipos_import_request/);
+  assert.match(concurrencyImportHolder, /commit_ipos_normalization/);
+  assert.match(concurrencyImportPrep, /ipos_normalization_commit_rows cr[\s\S]*?ORDER BY cr\.created_at DESC, cr\.commit_id DESC, cr\.source_row_number DESC/,
+    'Scenario G preparation orders commit rows by their actual composite primary key');
+  assert.match(concurrencyRunner, /ipos_normalization_commit_rows cr[\s\S]*?ORDER BY cr\.created_at DESC, cr\.commit_id DESC, cr\.source_row_number DESC/,
+    'Scenario G payload lookup uses the actual commit-row key for deterministic ordering');
+  assert.doesNotMatch(concurrencyImportPrep + concurrencyRunner, /cr\.id\b/,
+    'the commit-row schema has no id column');
+  assert.doesNotMatch(concurrencyRunner + concurrencyHeldWorker + concurrencyWaiter + concurrencyImportHolder + concurrencyImportPrep,
+    /\.env\.local|supabase\.co|SUPABASE_(URL|SERVICE_ROLE_KEY|ACCESS_TOKEN)|db push|DATABASE_URL/i);
+  assert.doesNotMatch(concurrencyRunner + concurrencyHeldWorker + concurrencyWaiter + concurrencyImportHolder + concurrencyImportPrep,
+    /product_costs|product_cost_history|\bhpp\b/i, 'no concurrency scenario reads or emits HPP');
+  assert.match(concurrencyRunner, /Append-only audit rows cannot be deleted/);
+  assert.match(concurrencyRunner, /stock effects neutralized/);
 });
 
 test('role rules deny KASIR and reserve approval, reconciliation, and reversal for OWNER/ADMIN', () => {

@@ -15,10 +15,14 @@ After reviewing the prepared state, run
 to this same guarded database. Then run
 `bash tests/staging/run-stock-runtime-matrix.sh` for the synthetic transactional
 assertions, and `bash tests/staging/verify-stock-staging.sh` for a read-only
-summary. Use these guarded shell entry points rather than connecting with a
-bare `psql` command. The runtime matrix rolls back its test transaction; it does
-not test multi-session concurrency or durable behavior across independent
-transactions. No script executes automatically as part of tests or application
+summary. The separate `bash tests/staging/run-stock-concurrency-matrix.sh`
+launches genuine concurrent psql connections for scenarios A/B/E/F/D/G. It
+commits synthetic test operations, restores the product's stock effect, and
+retains append-only tagged audit rows. Scenarios C and H are explicitly
+deferred: there is no generic manual movement/Sale RPC, and public multi-product
+operations internally sort product IDs so callers cannot request reverse lock
+order. Use these guarded shell entry points rather than connecting with a bare
+`psql` command. No script executes automatically as part of tests or application
 startup.
 
 If preparation stops after bootstrap or a migration, the optional reset entry
@@ -60,6 +64,15 @@ aliases, and a duplicate barcode on two products. It contains no production
 data. Runtime mutation/concurrency tests are a separate step and must run only
 after migration 180000 has been applied to this isolated target.
 
-The scripts never drop or recreate the database. If a run stops or refuses due
-to an unexpected state, stop and inspect the staging database; do not rerun a
-migration manually or alter objects until the database contents are reviewed.
+The scripts never drop or recreate the database during runtime/concurrency
+matrices. The concurrency runner recovers only tagged draft sessions and
+neutralizes tagged posted stock effects before rerun; immutable audit rows are
+retained. If a run stops or refuses due to an unexpected state, stop and inspect
+the staging database; do not rerun a migration manually or alter objects until
+the database contents are reviewed.
+
+The Phase 3C.1 single-session and multi-session matrices passed on local
+PostgreSQL 15. Migrations 171000 and 180000 remain local and are NOT deployed to
+production; production migration history remains through 170000. No production
+mutation tests were performed. Controlled pre-deployment review is the next
+gate. These results do not mean a native Stock UI exists.
