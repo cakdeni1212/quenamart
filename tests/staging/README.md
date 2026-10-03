@@ -77,5 +77,38 @@ production. Migration 180000's 34-component read-only post-deployment checker
 passed with no blocking failures or review gates; it verified 5,103 projection
 rows, 5,103 inventory rows, 5,103 bootstrap events, and 4,527 active barcodes.
 No production stock mutation tests were performed. Scenarios C and H remain
-deferred for the API and lock-order reasons above. These staging results do not
-mean a native Stock UI exists.
+deferred for the API and lock-order reasons above. Those results cover the
+Phase 3C.1A foundation and do not verify the later Stock Workspace read API.
+
+For the local Phase 3C.1B read API, the user-run PostgreSQL 15.18 staging test
+passed on the synthetic eight-product fixture. OWNER/ADMIN/GUDANG/KASIR,
+search/filter/summary, and pagination assertions passed; EXPLAIN ANALYZE took
+2.316 ms on this small fixture, not a production-scale benchmark. Migration
+190000 is deployed, ledgered, production-verified, and immutable; its SHA-256
+is `f3e6382354bf0c1f5d9f7f1530180ed039375ac42a7e7afac4bc9d493cc3e576`.
+The app's `/stok` route was browser-smoke-tested. To verify an already-applied local
+copy without reapplying it, run
+`bash tests/staging/run-stock-workspace-read-check.sh`; the runner requires the
+loopback, database, PostgreSQL 15, marker, ledger, and exact function-signature
+guards and applies no migration.
+
+The representative scale harness is
+`bash tests/staging/run-stock-workspace-scale-check.sh`. It verifies the local
+190000 migration ledger and the reviewed SQL file SHA-256 before opening a
+single transaction. It creates synthetic iPos rows through the staging import
+and normalization RPCs, adds provenance-matched projection baselines, runs the
+OWNER/RLS Stock RPC correctness cases and EXPLAIN ANALYZE measurements, then
+rolls the entire transaction back. The intended dataset is 5,104 outlet
+memberships (the existing eight plus 5,096 synthetic products), 5,103 usable
+projections, and one intentionally missing projection. Do not interpret its
+synthetic results as production data. The validated after-ANALYZE local scale
+timings were: default page 1 333.201 ms, page 50 253.113 ms, HABIS 226.374 ms,
+MENIPIS 236.075 ms, rack-empty 223.425 ms, selective SKU 267.777 ms, and
+selective barcode 267.678 ms. The earlier pathological plan was due to stale or
+missing synthetic transaction statistics; no query rewrite or index change was
+needed.
+
+Phase 3C.2 Checkpoint 1 adds the bounded, read-only `/stok/opname` session list
+for OWNER/ADMIN/GUDANG; KASIR is denied. The list has pagination and status
+filtering and performs no mutations. Opname creation/count/review/post workflows
+remain unimplemented.

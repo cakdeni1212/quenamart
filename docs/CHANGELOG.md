@@ -1,12 +1,29 @@
 # Changelog
 
+## 2026-10-03 — Phase 3C.1B verified; Phase 3C.2 Checkpoint 1
+
+- Migration `20260929190000_stock_workspace_read_v1.sql` is deployed, ledgered, production-verified, and immutable. Production migration ledger matches local through 190000. Artifact SHA-256: `f3e6382354bf0c1f5d9f7f1530180ed039375ac42a7e7afac4bc9d493cc3e576`.
+- `/stok` was browser-smoke-tested. Local scale validation after ANALYZE passed at approximately 5,103 products: default page 1 333.201 ms; page 50 253.113 ms; HABIS 226.374 ms; MENIPIS 236.075 ms; rack-empty 223.425 ms; selective SKU 267.777 ms; selective barcode 267.678 ms. The earlier pathological plan was caused by stale/missing statistics in the synthetic transaction fixture; no query rewrite or index change was required.
+- Added read-only `/stok/opname` session list for OWNER/ADMIN/GUDANG, with bounded pagination/filtering; KASIR is denied. No Opname mutation workflow is implemented yet.
+
+## 2026-10-02 — Phase 3C.1B read-only Stock workspace
+
+- Added `/stok` for OWNER, ADMIN, and GUDANG with effective stock from `stock_balance_projection`, product metadata, minimum stock, rack, barcode, presentation-only status, summary counts, live search, status/rack-empty filters, and server-side 50-row pagination.
+- Scanner Enter uses the deployed exact `resolve_stock_barcode` RPC. Unknown and ambiguous barcodes are surfaced explicitly; no product creation or POS action is performed.
+- The page is read-only and does not expose HPP/cost fields. Opname and stock mutation workflows remain out of scope.
+
+## 2026-10-02 — Phase 3C.1B bounded Stock read proposal (superseded by deployment entry above)
+
+- Added migration `20260929190000_stock_workspace_read_v1.sql` with one authenticated read-only RPC that returns a bounded page, filtered counts, summaries, and projection-integrity count.
+- Refactored `/stok` to stop walking `product_workspace_list` pages and projection chunks; `stock_balance_projection.effective_quantity` remains authoritative. User-run PostgreSQL 15.18 local staging role, search/filter, summary, pagination, and bounded-row checks passed on the synthetic eight-product fixture. EXPLAIN ANALYZE took 2.316 ms on that fixture; this was not a production-scale benchmark. At the time of this proposal entry, migration 190000 had not yet been deployed; its verified deployment is recorded above.
+
 ## 2026-10-02 — Phase 3C.1A Stock Foundation deployed and verified
 
 - Deployed and ledger-confirmed the forward-only correction-intent ambiguity fix `20260929171000`; read-only post-deployment checks passed for the ledger, function definitions/signatures, overloads, and security/grants.
 - Deployed and ledger-confirmed stock foundation `20260929180000`. Its 34-component read-only production post-deployment checker passed: `overall_gate=PASS`, `blocking_failures=0`, `review_gates=0`.
 - Production verification confirmed 5,103/5,103 stock projection rows, 5,103 inventory rows, 5,103 bootstrap events, and 4,527 active barcodes, with no unexpected movement, reconciliation, opname, or stock-operation request rows.
 - Local PostgreSQL 15 single-session and multi-session matrices passed. Concurrency scenarios A/B/D/E/F/G passed with real lock overlap; C (no generic manual movement/Sale RPC) and H (no public reverse-order multi-product call path) remain deferred. No production mutation tests were performed.
-- Phase 3C.1A is complete. No native Stock UI exists yet; no production mutation tests were performed.
+- Phase 3C.1A is complete and did not include a native Stock UI; no production mutation tests were performed.
 
 ## 2026-09-30 — Stock database foundation (Phase 3C.1A; local staging verified)
 
@@ -14,7 +31,7 @@
 - `product_inventory` remains the normalized iPos snapshot. Stock operations update only the projection and immutable movement/event records. Daily iPos sales imports remain reporting-only; no stock UI or importer behavior was added.
 - Revised the local proposal after adversarial review: initial bootstrap now validates normalized `STOK` against the stored inventory quantity; ordinary imports only record observations (no upload-time/UUID chronology); barcode resolution groups matching rows by distinct product; and reversal pairs reconcile atomically by net delta.
 - Documented the v1 no-negative-effective-stock rule, strictly increasing stale/count revisions, and deterministic FULL scope captured at session creation. Migration 180000 and forward fix 171000 passed the synthetic local PostgreSQL 15 runtime matrix; its transaction rolled back. Bootstrap verified 8/8 projection rows matched source and baseline values.
-- Runtime coverage includes authenticated OWNER/GUDANG/KASIR behavior, barcode resolution, count/recount/post, exact retry, stale-baseline handling, negative-stock rejection, observation-only imports, reversal-group reconciliation, and immutability. Bootstrap verified 8/8 projection rows against source and baseline. The single-session matrix rolled back; no native Stock UI exists yet.
+- Runtime coverage includes authenticated OWNER/GUDANG/KASIR behavior, barcode resolution, count/recount/post, exact retry, stale-baseline handling, negative-stock rejection, observation-only imports, reversal-group reconciliation, and immutability. Bootstrap verified 8/8 projection rows against source and baseline. The single-session matrix rolled back. At that checkpoint no native Stock UI had been implemented.
 - Updated migration 180000 so every `RECORD_COUNT` intent requires and binds caller-observed `expected_revision`. A stale client revision returns replayable `STALE_BASELINE`/`ITEM_REVISION_MISMATCH` without overwriting the count or consuming a revision; projection-baseline staleness remains distinct. The revised migration passed the user-run PostgreSQL 15 local staging single-session matrix.
 - The local-only multi-session harness passed A/B/E/F/D/G with separate psql sessions and observed database lock overlap. C is deferred because 180000 exposes no generic manual movement/Sale RPC. H is deferred because public multi-product paths sort product IDs internally and expose no caller-controlled reverse lock order. The runner commits local synthetic operations, neutralizes stock effects, and retains append-only audit rows. These staging results do not constitute production deployment or production mutation testing.
 - At the time of this 2026-09-30 entry, production migration history remained through 170000 and neither 171000 nor 180000 was deployed. Current status is recorded in the 2026-10-02 entry above.

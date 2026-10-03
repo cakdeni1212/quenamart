@@ -43,7 +43,11 @@
 - [ ] Production stock mutation tests remain prohibited; runtime mutation and concurrency verification is staging-only.
 - [ ] Add and validate trusted iPos source chronology (`source_snapshot_at` or monotonic source sequence) before enabling any automatic projection baseline acceptance. Upload time and batch UUID are not chronology; current imports record observations only.
 - [ ] Implement later manual stock-operation draft documents and their edit/cancel workflow before exposing manual in/out operations; posted changes must use immutable movements and reversals.
-- [ ] Implement the native Stock workspace and stock-opname UI; no Stock UI exists yet.
+- [x] Implement the read-only `/stok` UI for OWNER/ADMIN/GUDANG using effective stock projection, exact barcode resolution, URL-backed search/filters, and responsive layout. No stock mutation or opname UI is included.
+- [x] Deploy, ledger, and verify immutable migration `20260929190000_stock_workspace_read_v1.sql`; production ledger matches local through 190000. Artifact SHA-256: `f3e6382354bf0c1f5d9f7f1530180ed039375ac42a7e7afac4bc9d493cc3e576`.
+- [x] Browser-smoke-test `/stok` and validate the read RPC at approximately 5,103 products after ANALYZE. Timings: default page 1 333.201 ms; page 50 253.113 ms; HABIS 226.374 ms; MENIPIS 236.075 ms; rack-empty 223.425 ms; selective SKU 267.777 ms; selective barcode 267.678 ms. The earlier pathological plan was due to stale/missing statistics in the synthetic transaction fixture; no SQL rewrite/index change was needed.
+- [x] Implement the bounded, read-only `/stok/opname` session list for OWNER/ADMIN/GUDANG; KASIR is denied.
+- [ ] Implement Stock Opname mutations in a later checkpoint; creation, counting, review, cancellation, approval, and posting are not yet available in the UI.
 
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
 - Implement POS carts, parked transactions, payments, member lookup, receipts, and stock consistency.
