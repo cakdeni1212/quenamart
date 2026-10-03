@@ -112,3 +112,13 @@ Phase 3C.2 Checkpoint 1 adds the bounded, read-only `/stok/opname` session list
 for OWNER/ADMIN/GUDANG; KASIR is denied. The list has pagination and status
 filtering and performs no mutations. Opname creation/count/review/post workflows
 remain unimplemented.
+
+For Phase 3C.2 Checkpoint 2 CREATE_SESSION database validation, run
+`bash tests/staging/run-stock-opname-create-matrix.sh`. This runner requires
+the guarded local target, staging marker, and both 180000/190000 local ledger
+entries; it never applies a migration. Its authenticated OWNER/ADMIN/GUDANG/
+KASIR checks call only the existing CREATE_SESSION intent/apply RPCs. Each
+case is isolated by a rollback-only PL/pgSQL subtransaction and the outer SQL
+transaction ends with ROLLBACK, so no opname session, request, event, movement,
+or stock change is retained. The matrix also checks same-request replay,
+post-completion request identity, and active-scope overlap behavior.

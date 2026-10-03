@@ -17,7 +17,7 @@ export default async function StockOpnamePage({ searchParams }: { searchParams: 
     <div className="eyebrow">PERSEDIAAN OUTLET · BACA SAJA</div>
     <div className="page-heading stock-opname-heading">
       <div><h1>Stock Opname</h1><p>Daftar sesi opname dan statusnya. Tindakan opname belum tersedia di halaman ini.</p></div>
-      <span className="stock-readonly-badge">Baca saja</span>
+      <div className="stock-heading-actions"><Link className="stock-opname-link" href="/stok/opname/baru">Buat sesi</Link><span className="stock-readonly-badge">Baca saja</span></div>
     </div>
     <StockOpnameList data={data} />
   </main>;
