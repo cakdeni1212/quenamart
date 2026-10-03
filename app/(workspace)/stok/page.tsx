@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { requireProfile } from "@/lib/auth/session";
 import { canAccessSection } from "@/lib/auth/roles";
 import { readStockWorkspace } from "@/lib/stock/read";
@@ -15,7 +16,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
     <div className="eyebrow">PERSEDIAAN OUTLET · BACA SAJA</div>
     <div className="page-heading stock-heading">
       <div><h1>Stok</h1><p>Saldo efektif dari proyeksi stok Quena Mart{data.outletName ? ` · ${data.outletName}` : ""}.</p></div>
-      <span className="stock-readonly-badge">Baca saja</span>
+      <div className="stock-heading-actions"><Link className="stock-opname-link" href="/stok/opname">Daftar opname</Link><span className="stock-readonly-badge">Baca saja</span></div>
     </div>
     <StockWorkspace data={data} />
   </main>;
