@@ -110,8 +110,9 @@ needed.
 
 Phase 3C.2 Checkpoint 1 adds the bounded, read-only `/stok/opname` session list
 for OWNER/ADMIN/GUDANG; KASIR is denied. The list has pagination and status
-filtering and performs no mutations. Opname creation/count/review/post workflows
-remain unimplemented.
+filtering and performs no mutations. Session creation and counting were added
+in later checkpoints; rebase/exception revision hardening is covered by the
+local-only 200000 matrix described below.
 
 For Phase 3C.2 Checkpoint 2 CREATE_SESSION database validation, run
 `bash tests/staging/run-stock-opname-create-matrix.sh`. This runner requires
@@ -136,3 +137,21 @@ The local PostgreSQL 15 RECORD_COUNT matrix passed. Browser mutation smoke
 testing remains deferred because the available port 3001 app is production-
 backed and no disposable local Supabase API/Auth/PostgREST stack is verified.
 No production mutation was performed.
+
+For the forward-only REBASE_ITEM / REVIEW_EXCEPTION revision guard and
+database-derived progress contract, first review
+`supabase/migrations/20260929200000_stock_opname_revision_guard_v1.sql`, then
+run `bash tests/staging/apply-stock-opname-revision-guard.sh`. That runner
+requires the exact local migration ledger through 190000, the synthetic stock
+fixture marker, loopback PostgreSQL 15, and the 200000 functions to be absent;
+it applies only 200000 and records the local harness ledger row afterward.
+Then run `bash tests/staging/run-stock-opname-revision-guard-matrix.sh`. The
+matrix covers role gates, revision mismatch without item/event mutation,
+matching rebase/exception, retries, legacy pending requests, progress counts,
+and unchanged stock quantities. All runtime mutations occur in one
+rollback-only transaction, followed by a durable-state fingerprint comparison.
+The revision-guard runtime matrix passed on local PostgreSQL staging, including
+rollback and matching post-rollback durable-state fingerprints. Migration
+200000 is not deployed to production. These are local staging checks only; do
+not use these scripts against production. The revision guard does not add UI
+or counting/review lifecycle controls.

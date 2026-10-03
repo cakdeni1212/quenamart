@@ -361,7 +361,9 @@ BEGIN
      <> (SELECT count(*) FROM public.stock_opname_count_events WHERE item_id = v_item) THEN
     RAISE EXCEPTION 'Count-event revisions are not unique for the item';
   END IF;
-  v_request := public.issue_stock_operation_intent('REBASE_ITEM', jsonb_build_object('session_id', v_session, 'product_id', v_product));
+  v_request := public.issue_stock_operation_intent('REBASE_ITEM', jsonb_build_object(
+    'session_id', v_session, 'product_id', v_product,
+    'expected_revision', (SELECT revision_no FROM public.stock_opname_items WHERE session_id = v_session AND product_id = v_product)));
   PERFORM public.apply_stock_operation_intent(v_request);
   v_request := public.issue_stock_operation_intent('RECORD_COUNT', jsonb_build_object(
     'session_id', v_session, 'product_id', v_product, 'physical_quantity', 11,
