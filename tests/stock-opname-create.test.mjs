@@ -8,6 +8,7 @@ const page = readFileSync(new URL('../app/(workspace)/stok/opname/baru/page.tsx'
 const form = readFileSync(new URL('../src/components/stock/stock-opname-create-form.tsx', import.meta.url), 'utf8');
 const reader = readFileSync(new URL('../src/lib/stock/opname-create-read.ts', import.meta.url), 'utf8');
 const detail = readFileSync(new URL('../app/(workspace)/stok/opname/[id]/page.tsx', import.meta.url), 'utf8');
+const countReader = readFileSync(new URL('../src/lib/stock/opname-count-read.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20260929180000_stock_foundation_v1.sql', import.meta.url), 'utf8');
 const runtimeSql = readFileSync(new URL('./staging/runtime-stock-opname-create.sql', import.meta.url), 'utf8');
 const runtimeRunner = readFileSync(new URL('./staging/run-stock-opname-create-matrix.sh', import.meta.url), 'utf8');
@@ -75,11 +76,11 @@ test('confirmation is explicit and buttons prevent duplicate in-flight submissio
 });
 
 test('detail route is read-only and reports created session scope, status, time, and item count', () => {
-  assert.match(detail, /\.from\("stock_opname_sessions"\)[\s\S]*\.maybeSingle\(\)/);
-  assert.match(detail, /\.from\("stock_opname_items"\)[\s\S]*select\("id", \{ count: "exact", head: true \}\)/);
-  assert.match(detail, /scope_type/);
-  assert.match(detail, /STATUS_LABEL/);
-  assert.match(detail, /created_at/);
+  assert.match(detail, /readStockOpnameCounting\(profile, id, query\)/);
+  assert.match(countReader, /\.from\("stock_opname_sessions"\)[\s\S]*\.maybeSingle\(\)/);
+  assert.match(countReader, /\.from\("stock_opname_items"\)[\s\S]*select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(countReader, /scope_type/);
+  assert.match(countReader, /created_at/);
   assert.doesNotMatch(detail, /RECORD_COUNT|REBASE_ITEM|REVIEW_EXCEPTION|SUBMIT_REVIEW|CANCEL_SESSION|POST_SESSION|HPP|product_costs/i);
 });
 

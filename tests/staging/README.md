@@ -122,3 +122,17 @@ case is isolated by a rollback-only PL/pgSQL subtransaction and the outer SQL
 transaction ends with ROLLBACK, so no opname session, request, event, movement,
 or stock change is retained. The matrix also checks same-request replay,
 post-completion request identity, and active-scope overlap behavior.
+
+For Phase 3C.2 Checkpoint 3 RECORD_COUNT validation, run
+`bash tests/staging/run-stock-opname-count-matrix.sh`. It uses the same guarded
+local target and durable-state fingerprint. OWNER/ADMIN/GUDANG count cases,
+KASIR denial, zero and three-decimal quantities, replacement revisions, stale
+client revisions, exact request replay, and a projection-baseline-stale result
+are exercised through the existing trusted intent/apply RPCs. The stale
+baseline setup uses existing create/count/review/post/reversal RPCs inside the
+same transaction. The entire transaction rolls back; the runner then confirms
+the durable staging fingerprint is unchanged. It never applies a migration.
+The local PostgreSQL 15 RECORD_COUNT matrix passed. Browser mutation smoke
+testing remains deferred because the available port 3001 app is production-
+backed and no disposable local Supabase API/Auth/PostgREST stack is verified.
+No production mutation was performed.
