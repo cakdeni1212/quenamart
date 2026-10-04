@@ -45,3 +45,19 @@ test('read-only list omits unsafe actor lookups and renders responsive non-finan
   assert.doesNotMatch(list, /product_inventory|minimum_quantity|hpp|cost|profit|stock_operation_intent/i);
   assert.match(stockPage, /href="\/stok\/opname"/);
 });
+
+test('every session card is a keyboard-accessible link to its detail route with status-specific navigation cue', () => {
+  assert.match(list, /<li className="surface-card stock-opname-card"[\s\S]*?<Link className="stock-opname-card-link" href=\{`\/stok\/opname\/\$\{row\.id\}`\}/);
+  assert.match(list, /COUNTING: "Lanjutkan opname"/);
+  assert.match(list, /REVIEW: "Buka review"/);
+  assert.match(list, /POSTED: "Lihat hasil"/);
+  assert.match(list, /CANCELLED: "Lihat detail"/);
+  assert.match(list, /<span className="stock-opname-card-action">\{OPEN_ACTION\[row\.status\]\}/);
+});
+
+test('list copy no longer presents the Stock Opname module as globally read-only', () => {
+  assert.doesNotMatch(page, /Tindakan opname belum tersedia|Baca saja|BACA SAJA/);
+  assert.match(page, /Kelola sesi stock opname, lanjutkan penghitungan, review, dan posting hasil/);
+  assert.match(page, /Kelola sesi stock opname, lanjutkan penghitungan dan review hasil/);
+  assert.doesNotMatch(list, /Daftar sesi · baca saja/);
+});

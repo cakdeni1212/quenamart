@@ -10,6 +10,13 @@ const STATUS_LABEL: Record<StockOpnameListStatus, string> = {
   CANCELLED: "Dibatalkan",
 };
 
+const OPEN_ACTION: Record<Exclude<StockOpnameListStatus, "ALL">, string> = {
+  COUNTING: "Lanjutkan opname",
+  REVIEW: "Buka review",
+  POSTED: "Lihat hasil",
+  CANCELLED: "Lihat detail",
+};
+
 function hrefFor(status: StockOpnameListStatus, page: number) {
   const params = new URLSearchParams();
   if (status !== "ALL") params.set("status", status);
@@ -45,15 +52,17 @@ export function StockOpnameList({ data }: { data: StockOpnameListData }) {
       <p className="stock-opname-result-note">Menampilkan {data.start}–{data.end} dari {data.total} sesi</p>
       <ol className="stock-opname-list">
         {data.rows.map((row) => <li className="surface-card stock-opname-card" key={row.id}>
-          <div className="stock-opname-card-main">
-            <div className="stock-opname-card-title"><strong>Opname #{row.reference}</strong><span className={`stock-opname-status stock-opname-status-${row.status.toLowerCase()}`}>{STATUS_LABEL[row.status]}</span></div>
-            <dl className="stock-opname-card-details">
-              <div><dt>Outlet</dt><dd>{row.outletName}</dd></div>
-              <div><dt>Ruang lingkup</dt><dd>{row.scope === "FULL" ? "Penuh" : "Sebagian"}</dd></div>
-              <div><dt>Dibuat</dt><dd><time dateTime={row.createdAt}>{dateTime(row.createdAt)}</time></dd></div>
-            </dl>
-          </div>
-          <span className="stock-opname-readonly-note">Daftar sesi · baca saja</span>
+          <Link className="stock-opname-card-link" href={`/stok/opname/${row.id}`}>
+            <div className="stock-opname-card-main">
+              <div className="stock-opname-card-title"><strong>Opname #{row.reference}</strong><span className={`stock-opname-status stock-opname-status-${row.status.toLowerCase()}`}>{STATUS_LABEL[row.status]}</span></div>
+              <dl className="stock-opname-card-details">
+                <div><dt>Outlet</dt><dd>{row.outletName}</dd></div>
+                <div><dt>Ruang lingkup</dt><dd>{row.scope === "FULL" ? "Penuh" : "Sebagian"}</dd></div>
+                <div><dt>Dibuat</dt><dd><time dateTime={row.createdAt}>{dateTime(row.createdAt)}</time></dd></div>
+              </dl>
+            </div>
+            <span className="stock-opname-card-action">{OPEN_ACTION[row.status]} <span aria-hidden="true">→</span></span>
+          </Link>
         </li>)}
       </ol>
       <nav className="product-pagination" aria-label="Halaman daftar opname">
