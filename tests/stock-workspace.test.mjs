@@ -76,6 +76,14 @@ test('server route enforces allowed roles and uses the stock projection as effec
   assert.doesNotMatch(read, /from\("product_inventory"\)|product_costs|\bhpp\b|selling_price/);
 });
 
+test('stock page explains controlled stock changes without presenting direct editing', () => {
+  assert.match(page, /Saldo efektif dari proyeksi stok Quena Mart/);
+  assert.match(page, /Perubahan stok dilakukan melalui alur terkontrol seperti Stock Opname/);
+  assert.match(page, /href="\/stok\/opname">Daftar opname</);
+  assert.doesNotMatch(page, /Baca saja|BACA SAJA|stock-readonly-badge/);
+  assert.doesNotMatch(page, /stock_operation_intent|UPDATE|INSERT|onChange=\{.*effectiveQuantity/);
+});
+
 test('barcode submission uses exact resolver and preserves 0/1/many outcomes without product creation', () => {
   assert.match(read, /rpc\("resolve_stock_barcode"/);
   assert.match(read, /BARCODE_NOT_FOUND/);

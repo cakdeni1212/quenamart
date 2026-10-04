@@ -13,10 +13,10 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const data = await readStockWorkspace(profile, await searchParams);
 
   return <main className="page-content stock-page">
-    <div className="eyebrow">PERSEDIAAN OUTLET · BACA SAJA</div>
+    <div className="eyebrow">PERSEDIAAN OUTLET</div>
     <div className="page-heading stock-heading">
-      <div><h1>Stok</h1><p>Saldo efektif dari proyeksi stok Quena Mart{data.outletName ? ` · ${data.outletName}` : ""}.</p></div>
-      <div className="stock-heading-actions"><Link className="stock-opname-link" href="/stok/opname">Daftar opname</Link><span className="stock-readonly-badge">Baca saja</span></div>
+      <div><h1>Stok</h1><p>Saldo efektif dari proyeksi stok Quena Mart. Perubahan stok dilakukan melalui alur terkontrol seperti Stock Opname{data.outletName ? ` · ${data.outletName}` : ""}.</p></div>
+      <div className="stock-heading-actions"><Link className="stock-opname-link" href="/stok/opname">Daftar opname</Link></div>
     </div>
     <StockWorkspace data={data} />
   </main>;
