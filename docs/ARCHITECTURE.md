@@ -55,7 +55,7 @@ Migration 180000 requires every `RECORD_COUNT` intent to bind the client-observe
 
 ## Phase 3C.2 Checkpoint 1
 
-`/stok/opname` is a read-only, bounded and paginated session list for OWNER, ADMIN, and GUDANG; KASIR is denied. The list supports status filtering and shows session/outlet/scope/progress metadata without HPP or financial data. Creation, counting, review, cancellation, approval, posting, and other mutation workflows have not been implemented.
+`/stok/opname` is a bounded session list for OWNER, ADMIN, and GUDANG; KASIR is denied. Checkpoints 2 and 3 add session creation and RECORD_COUNT counting. Migration `20260929200000_stock_opname_revision_guard_v1.sql` adds optimistic revision guards for REBASE_ITEM and REVIEW_EXCEPTION plus database-derived progress counts. It is deployed, ledgered, and production-verified; the production read-only checker passed gates 1–8, and its informational inventory/projection/activity snapshot was unchanged. No production mutation tests were performed. Browser mutation smoke testing remains deferred because no disposable local Supabase API/Auth/PostgREST stack is verified. Rebase/exception UI and later review/posting lifecycle controls remain unimplemented.
 
 ## Authorization principles
 

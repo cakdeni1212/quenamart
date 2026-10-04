@@ -46,8 +46,9 @@
 - [x] Implement the read-only `/stok` UI for OWNER/ADMIN/GUDANG using effective stock projection, exact barcode resolution, URL-backed search/filters, and responsive layout. No stock mutation or opname UI is included.
 - [x] Deploy, ledger, and verify immutable migration `20260929190000_stock_workspace_read_v1.sql`; production ledger matches local through 190000. Artifact SHA-256: `f3e6382354bf0c1f5d9f7f1530180ed039375ac42a7e7afac4bc9d493cc3e576`.
 - [x] Browser-smoke-test `/stok` and validate the read RPC at approximately 5,103 products after ANALYZE. Timings: default page 1 333.201 ms; page 50 253.113 ms; HABIS 226.374 ms; MENIPIS 236.075 ms; rack-empty 223.425 ms; selective SKU 267.777 ms; selective barcode 267.678 ms. The earlier pathological plan was due to stale/missing statistics in the synthetic transaction fixture; no SQL rewrite/index change was needed.
-- [x] Implement the bounded, read-only `/stok/opname` session list for OWNER/ADMIN/GUDANG; KASIR is denied.
-- [ ] Implement Stock Opname mutations in a later checkpoint; creation, counting, review, cancellation, approval, and posting are not yet available in the UI.
+- [x] Implement the bounded `/stok/opname` session list, CREATE_SESSION flow, and RECORD_COUNT workspace for OWNER/ADMIN/GUDANG; KASIR is denied.
+- [x] Deploy and verify migration `20260929200000_stock_opname_revision_guard_v1.sql` (SHA-256 `167ff44d3076baeaf07ca6d554b84cf05a03b2a6f5e5fc370fac97e87bccd43f`); production postdeploy gates 1–8 passed and the informational 5,103-row inventory/projection snapshot was unchanged. No production mutation tests were performed.
+- [ ] Implement the REBASE_ITEM / REVIEW_EXCEPTION UI and remaining Stock Opname review, cancellation, and posting controls. Browser mutation smoke testing remains deferred until a disposable local Supabase API/Auth/PostgREST environment is verified.
 
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
 - Implement POS carts, parked transactions, payments, member lookup, receipts, and stock consistency.

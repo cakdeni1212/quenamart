@@ -152,6 +152,9 @@ and unchanged stock quantities. All runtime mutations occur in one
 rollback-only transaction, followed by a durable-state fingerprint comparison.
 The revision-guard runtime matrix passed on local PostgreSQL staging, including
 rollback and matching post-rollback durable-state fingerprints. Migration
-200000 is not deployed to production. These are local staging checks only; do
-not use these scripts against production. The revision guard does not add UI
-or counting/review lifecycle controls.
+200000 is now deployed, ledgered, and production-verified; its read-only
+postdeploy gates 1–8 passed and the informational data snapshot was unchanged.
+These scripts remain local staging checks only; do not use them against
+production. No production mutation tests were performed, and browser mutation
+smoke testing remains deferred because no disposable local Supabase
+API/Auth/PostgREST stack is verified.

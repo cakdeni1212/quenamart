@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-04 — Phase 3C.2 revision guard deployed and verified
+
+- Deployed and ledgered immutable migration `20260929200000_stock_opname_revision_guard_v1.sql` (SHA-256 `167ff44d3076baeaf07ca6d554b84cf05a03b2a6f5e5fc370fac97e87bccd43f`). The production read-only checker passed gates 1–8; its informational data snapshot was unchanged: inventory 5,103, inventory history 5,103, projection 5,103, and no movements, opname sessions/items, count events, or operation requests.
+- No production mutation tests were performed. Browser mutation smoke testing remains deferred because no disposable local Supabase API/Auth/PostgREST stack is verified. Checkpoint 4 rebase/exception UI and later review/posting controls remain pending.
+
 ## 2026-10-03 — Phase 3C.1B verified; Phase 3C.2 Checkpoint 1
 
 - Migration `20260929190000_stock_workspace_read_v1.sql` is deployed, ledgered, production-verified, and immutable. Production migration ledger matches local through 190000. Artifact SHA-256: `f3e6382354bf0c1f5d9f7f1530180ed039375ac42a7e7afac4bc9d493cc3e576`.
