@@ -46,6 +46,33 @@ export function countInputError(raw: string): string | null {
   return null;
 }
 
+export function normalizeExceptionReason(raw: string): string | null {
+  const reason = raw.trim();
+  return reason.length > 0 ? reason : null;
+}
+
+export type OpnameItemEditorState = {
+  editingProduct: string | null;
+  quantityDraft: string;
+  exceptionProduct: string | null;
+  exceptionReasonDraft: string;
+};
+
+export function transitionItemEditorAfterApply(
+  state: OpnameItemEditorState,
+  productId: string,
+  operation: "RECORD_COUNT" | "REBASE_ITEM" | "REVIEW_EXCEPTION",
+  succeeded: boolean,
+): OpnameItemEditorState {
+  if (!succeeded || operation === "RECORD_COUNT") return state;
+  return {
+    editingProduct: state.editingProduct === productId ? null : state.editingProduct,
+    quantityDraft: state.editingProduct === productId ? "" : state.quantityDraft,
+    exceptionProduct: state.exceptionProduct === productId ? null : state.exceptionProduct,
+    exceptionReasonDraft: state.exceptionProduct === productId ? "" : state.exceptionReasonDraft,
+  };
+}
+
 export function opnameCountResultMessage(result: {
   ok?: boolean;
   code?: string;

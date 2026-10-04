@@ -47,7 +47,7 @@ test('count operation binds caller revision, canonical quantity, and optional sc
 
 test('uncertain apply retry keeps and reuses the same request UUID instead of issuing another count', () => {
   assert.match(workspace, /savePendingValue\(pendingKey\(data\.session\.id, item\.productId\), JSON\.stringify\(pending\)\)/);
-  assert.match(workspace, /finishApply\(item\.productId, pending\.requestId\)/);
+  assert.match(workspace, /finishApply\(item\.productId, pending\)/);
   assert.match(workspace, /removePendingValue\(pendingKey\(data\.session\.id, productId\)\)/);
   assert.match(migration, /if v_req\.state in \('COMPLETED'::public\.stock_request_state, 'STALE'::public\.stock_request_state/);
 });
@@ -73,13 +73,13 @@ test('scanner resolves exact 0/1/many and only focuses an existing session item;
   assert.doesNotMatch(workspace, /physicalQuantity\s*\+\s*1|setQuantity\([^)]*\+\s*1/);
 });
 
-test('bounded count reads use server pagination/search, database progress counts, and batched page metadata', () => {
+test('bounded count reads use server pagination/search, one progress RPC, and batched page metadata', () => {
   assert.match(model, /STOCK_OPNAME_COUNT_PAGE_SIZE = 40/);
   assert.match(read, /\.range\(\(query\.page - 1\) \* STOCK_OPNAME_COUNT_PAGE_SIZE/);
   assert.match(read, /referencedTable: "products"/);
-  assert.match(read, /select\("id", \{ count: "exact", head: true \}\)/);
-  assert.match(read, /count\(\),\s*count\(\)\.not\("physical_quantity"/);
-  assert.match(read, /count\(\)\.eq\("requires_recount", true\)/);
+  assert.match(read, /rpc\("stock_opname_progress_counts", \{ p_session_id: session\.id \}\)/);
+  assert.match(read, /exception_reviewed_by, exception_reviewed_at/);
+  assert.doesNotMatch(read, /const count = \(\)|count\(\)\.not\("physical_quantity"|count\(\)\.eq\("requires_recount"/);
   assert.match(read, /\.in\("product_id", productIds\)/);
   assert.doesNotMatch(read, /for\s*\([^)]*productIds|Promise\.all\([^)]*map\(/);
   assert.match(read, /\.order\("name"[\s\S]*\.order\("sku"[\s\S]*\.order\("product_id"/);
@@ -94,9 +94,9 @@ test('count display uses the captured opname baseline and generated variance, ne
   assert.doesNotMatch(action + workspace, /\.from\("stock_opname_items"\)\s*\.(insert|update|upsert|delete)|\.from\("stock_balance_projection"\)\s*\.(insert|update|upsert|delete)/i);
 });
 
-test('only RECORD_COUNT is implemented; no later workflow operation is exposed', () => {
+test('count action remains scoped to RECORD_COUNT and later lifecycle actions stay absent', () => {
   assert.match(action, /p_operation_key: "RECORD_COUNT"/);
-  assert.doesNotMatch(action + workspace, /REBASE_ITEM|REVIEW_EXCEPTION|SUBMIT_REVIEW|RETURN_TO_COUNTING|CANCEL_SESSION|POST_SESSION|REVERSE_MOVEMENT|RECONCILE_MOVEMENT/);
+  assert.doesNotMatch(action + workspace, /SUBMIT_REVIEW|RETURN_TO_COUNTING|CANCEL_SESSION|POST_SESSION|REVERSE_MOVEMENT|RECONCILE_MOVEMENT/);
 });
 
 test('URL parsing is bounded and invalid filters fall back to ALL; PostgREST search is quoted', () => {

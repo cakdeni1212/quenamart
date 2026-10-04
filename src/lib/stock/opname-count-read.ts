@@ -26,7 +26,19 @@ type ItemRow = {
   quantity_variance: number | string | null;
   revision_no: number;
   requires_recount: boolean;
+  exception_reason: string | null;
+  exception_reviewed_by: string | null;
+  exception_reviewed_at: string | null;
   products: { name: string; sku: string };
+};
+
+type StockOpnameProgress = {
+  total: number;
+  counted: number;
+  exception: number;
+  accounted: number;
+  remaining: number;
+  recountRequired: number;
 };
 
 export type StockOpnameCountItem = {
@@ -41,6 +53,8 @@ export type StockOpnameCountItem = {
   variance: number | string | null;
   revision: number;
   requiresRecount: boolean;
+  exceptionReason: string | null;
+  exceptionReviewed: boolean;
 };
 
 export type StockOpnameCountData = {
@@ -54,7 +68,8 @@ export type StockOpnameCountData = {
   } | null;
   query: StockOpnameCountQuery;
   items: StockOpnameCountItem[];
-  progress: { counted: number; total: number; remaining: number; requiresRecount: number };
+  progress: StockOpnameProgress | null;
+  progressError: string | null;
   filteredTotal: number;
   pageCount: number;
   error: string | null;
@@ -65,7 +80,8 @@ function empty(query: StockOpnameCountQuery, error: string | null): StockOpnameC
     session: null,
     query,
     items: [],
-    progress: { counted: 0, total: 0, remaining: 0, requiresRecount: 0 },
+    progress: null,
+    progressError: null,
     filteredTotal: 0,
     pageCount: 0,
     error,
@@ -104,7 +120,7 @@ export async function readStockOpnameCounting(
 
   let itemRequest = supabase
     .from("stock_opname_items")
-    .select("id, product_id, outlet_id, baseline_quantity, physical_quantity, quantity_variance, revision_no, requires_recount, products!inner(name, sku)", { count: "exact" })
+    .select("id, product_id, outlet_id, baseline_quantity, physical_quantity, quantity_variance, revision_no, requires_recount, exception_reason, exception_reviewed_by, exception_reviewed_at, products!inner(name, sku)", { count: "exact" })
     .eq("session_id", session.id);
   if (query.filter === "UNCOUNTED") itemRequest = itemRequest.is("physical_quantity", null);
   if (query.filter === "COUNTED") itemRequest = itemRequest.not("physical_quantity", "is", null).eq("requires_recount", false);
@@ -114,38 +130,26 @@ export async function readStockOpnameCounting(
     itemRequest = itemRequest.or(`name.ilike.${pattern},sku.ilike.${pattern}`, { referencedTable: "products" });
   }
 
-  const count = () => supabase.from("stock_opname_items").select("id", { count: "exact", head: true }).eq("session_id", session.id);
-  const [itemResult, totalResult, countedResult, recountResult] = await Promise.all([
+  const [itemResult, progressResult] = await Promise.all([
     itemRequest
       .order("name", { referencedTable: "products", ascending: true })
       .order("sku", { referencedTable: "products", ascending: true })
       .order("product_id", { ascending: true })
       .range((query.page - 1) * STOCK_OPNAME_COUNT_PAGE_SIZE, query.page * STOCK_OPNAME_COUNT_PAGE_SIZE - 1),
-    count(),
-    count().not("physical_quantity", "is", null).eq("requires_recount", false),
-    count().eq("requires_recount", true),
+    supabase.rpc("stock_opname_progress_counts", { p_session_id: session.id }),
   ]);
-  for (const [operation, error] of [
-    ["stock_opname_items_page", itemResult.error],
-    ["stock_opname_total_count", totalResult.error],
-    ["stock_opname_counted_count", countedResult.error],
-    ["stock_opname_recount_count", recountResult.error],
-  ] as const) {
-    if (error) {
-      logFailure(operation, error);
-      return { ...empty(query, "Daftar item opname belum dapat dimuat."), session: {
-        id: session.id,
-        outletId: session.outlet_id,
-        outletName: session.outlets?.name ?? "Outlet",
-        scope: session.scope_type,
-        status: session.status,
-        createdAt: session.created_at,
-      } };
-    }
+  if (itemResult.error) {
+    logFailure("stock_opname_items_page", itemResult.error);
+    return { ...empty(query, "Daftar item opname belum dapat dimuat."), session: {
+      id: session.id,
+      outletId: session.outlet_id,
+      outletName: session.outlets?.name ?? "Outlet",
+      scope: session.scope_type,
+      status: session.status,
+      createdAt: session.created_at,
+    } };
   }
 
-  const total = totalResult.count ?? 0;
-  const counted = countedResult.count ?? 0;
   const pages = Math.ceil((itemResult.count ?? 0) / STOCK_OPNAME_COUNT_PAGE_SIZE);
   const page = pages === 0 ? 1 : Math.min(query.page, pages);
   if (page !== query.page) {
@@ -186,8 +190,40 @@ export async function readStockOpnameCounting(
     variance: item.quantity_variance,
     revision: item.revision_no,
     requiresRecount: item.requires_recount,
+    exceptionReason: item.exception_reason,
+    exceptionReviewed: Boolean(item.exception_reason?.trim()
+      && item.exception_reviewed_by && item.exception_reviewed_at),
   }));
   const filteredTotal = itemResult.count ?? 0;
+  let progress: StockOpnameProgress | null = null;
+  let progressError: string | null = null;
+  if (progressResult.error) {
+    logFailure("stock_opname_progress_counts", progressResult.error);
+    progressError = "Ringkasan progress belum dapat dimuat.";
+  } else if (progressResult.data && typeof progressResult.data === "object") {
+    const row = progressResult.data as Record<string, unknown>;
+    const readCount = (key: string) => {
+      const value = row[key];
+      const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+      return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+    };
+    const total = readCount("total");
+    const counted = readCount("counted");
+    const exception = readCount("exception");
+    const accounted = readCount("accounted");
+    const remaining = readCount("remaining");
+    const recountRequired = readCount("recount_required");
+    if (total !== null && counted !== null && exception !== null && accounted !== null
+        && remaining !== null && recountRequired !== null
+        && accounted === counted + exception && remaining === total - accounted) {
+      progress = { total, counted, exception, accounted, remaining, recountRequired };
+    } else {
+      progressError = "Ringkasan progress menerima data yang tidak lengkap.";
+      console.error("[stock-opname-count] read failed", { operation: "stock_opname_progress_shape" });
+    }
+  } else {
+    progressError = "Ringkasan progress belum tersedia.";
+  }
 
   return {
     session: {
@@ -200,7 +236,8 @@ export async function readStockOpnameCounting(
     },
     query: { ...query, page },
     items,
-    progress: { counted, total, remaining: total - counted, requiresRecount: recountResult.count ?? 0 },
+    progress,
+    progressError,
     filteredTotal,
     pageCount: pages,
     error: null,

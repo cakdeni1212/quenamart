@@ -78,7 +78,8 @@ test('confirmation is explicit and buttons prevent duplicate in-flight submissio
 test('detail route is read-only and reports created session scope, status, time, and item count', () => {
   assert.match(detail, /readStockOpnameCounting\(profile, id, query\)/);
   assert.match(countReader, /\.from\("stock_opname_sessions"\)[\s\S]*\.maybeSingle\(\)/);
-  assert.match(countReader, /\.from\("stock_opname_items"\)[\s\S]*select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(countReader, /\.from\("stock_opname_items"\)[\s\S]*select\([\s\S]*\{ count: "exact" \}\)[\s\S]*\.range\(/);
+  assert.match(countReader, /rpc\("stock_opname_progress_counts", \{ p_session_id: session\.id \}\)/);
   assert.match(countReader, /scope_type/);
   assert.match(countReader, /created_at/);
   assert.doesNotMatch(detail, /RECORD_COUNT|REBASE_ITEM|REVIEW_EXCEPTION|SUBMIT_REVIEW|CANCEL_SESSION|POST_SESSION|HPP|product_costs/i);
