@@ -146,13 +146,15 @@ test('cancel requires explicit confirmation and no cancellation reason is sent',
   assert.doesNotMatch(action, /cancel_reason|cancellation_reason|reason:/i);
 });
 
-test('lifecycle controls are limited to COUNTING and REVIEW; cancelled is read-only and posting stays out of scope', () => {
+test('lifecycle controls stay limited to COUNTING and REVIEW; POST_SESSION is kept out of the lifecycle action module', () => {
   assert.match(component, /data\.session\?\.status === "COUNTING"/);
   assert.match(component, /data\.session\?\.status === "REVIEW"/);
   assert.match(component, /data\.session\.status === "CANCELLED"[\s\S]*dibatalkan dan sekarang baca-saja/);
   assert.match(component, /data\.session\.status === "POSTED"[\s\S]*hanya dapat dilihat/);
   assert.match(component, /"Sedang direview"/);
-  assert.doesNotMatch(action + component, /POST_SESSION|approved|APPROVED|RECONCILE_MOVEMENT|REVERSE_MOVEMENT|stock_movements/);
+  assert.doesNotMatch(action, /POST_SESSION|approved|APPROVED|RECONCILE_MOVEMENT|REVERSE_MOVEMENT|stock_movements/);
+  assert.match(component, /POST_SESSION/);
+  assert.doesNotMatch(component, /APPROVED|RECONCILE_MOVEMENT|REVERSE_MOVEMENT|stock_movements/);
   assert.match(reader, /rpc\("stock_opname_progress_counts", \{ p_session_id: session\.id \}\)/);
   assert.match(component, /data\.items\.map/);
   assert.doesNotMatch(reader, /fetchAll|for\s*\([^)]*items/);

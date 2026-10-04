@@ -1,9 +1,17 @@
 # Changelog
 
+## 2026-10-04 — Phase 3C.2 Checkpoint 6 POST_SESSION local runtime passed
+
+- Added OWNER/ADMIN-only POST_SESSION confirmation at `/stok/opname/[id]` through the existing intent/apply RPCs. The app sends only `session_id`; database content hashing, projection checks, movement posting, and atomic stale handling remain authoritative.
+- Added distinct `SESSION_CHANGED`, `STALE_BASELINE`, known rejection, and uncertain apply outcomes. Retries reuse the session-scoped request UUID; POSTED is read-only. No durable movement summaries or schema changes were added.
+- The guarded local PostgreSQL 15 staging matrix passed OWNER/ADMIN posting, GUDANG/KASIR denial, positive/negative/zero adjustments, reviewed exceptions, movement/projection ledger assertions, exact UUID replay, SESSION_CHANGED, and all-or-none STALE_BASELINE. The transaction rolled back and the durable fingerprint matched. The first attempt failed safely because it compared a KASIR RLS-filtered session count with an OWNER-visible count; no authorization leak occurred. No production mutation tests were performed.
+- Browser mutation smoke remains deferred because no disposable local Supabase HTTP/Auth/PostgREST environment is verified.
+- Documented the future authority-period invariant: decide and enforce how open opname sessions behave across period transitions before those transitions become operational.
+
 ## 2026-10-04 — Phase 3C.2 revision guard deployed and verified
 
 - Deployed and ledgered immutable migration `20260929200000_stock_opname_revision_guard_v1.sql` (SHA-256 `167ff44d3076baeaf07ca6d554b84cf05a03b2a6f5e5fc370fac97e87bccd43f`). The production read-only checker passed gates 1–8; its informational data snapshot was unchanged: inventory 5,103, inventory history 5,103, projection 5,103, and no movements, opname sessions/items, count events, or operation requests.
-- No production mutation tests were performed. Browser mutation smoke testing remains deferred because no disposable local Supabase API/Auth/PostgREST stack is verified. Checkpoint 4 rebase/exception UI and later review/posting controls remain pending.
+- No production mutation tests were performed. Browser mutation smoke testing remains deferred because no disposable local Supabase API/Auth/PostgREST stack is verified. Checkpoint 4/5 UI is implemented; its staging runtime remains unverified.
 
 ## 2026-10-03 — Phase 3C.1B verified; Phase 3C.2 Checkpoint 1
 

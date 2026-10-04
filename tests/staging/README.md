@@ -158,3 +158,22 @@ These scripts remain local staging checks only; do not use them against
 production. No production mutation tests were performed, and browser mutation
 smoke testing remains deferred because no disposable local Supabase
 API/Auth/PostgREST stack is verified.
+
+For Phase 3C.2 Checkpoint 6 POST_SESSION runtime validation, run
+`bash tests/staging/run-stock-opname-post-matrix.sh`. The runner refuses any
+target other than loopback `quena_stock_staging` on PostgreSQL 15 with the
+staging marker and migrations through 200000 ledgered; it applies no migration.
+It uses the existing synthetic OWNER/ADMIN/GUDANG/KASIR profiles and stock
+fixtures, runs intent/apply requests in one transaction, and rolls the matrix
+back. It checks negative/positive/zero adjustments, reviewed exceptions, batch
+and movement linkage, projection versions/events, OWNER/ADMIN access,
+GUDANG/KASIR denial, exact replay, rejection of a new post after POSTED,
+SESSION_CHANGED, and all-or-none STALE_BASELINE behavior. The user-run matrix
+passed on local PostgreSQL 15 staging; the transaction rolled back and the
+durable stock/opname/inventory fingerprint matched. Its first attempt failed
+safely because a session count was compared under KASIR RLS rather than OWNER
+visibility; that harness assertion was corrected, with no authorization
+change. The runner never applies a migration, contacts production, or reads
+`.env.local`. No production mutation tests were performed, and browser mutation
+smoke remains deferred until a disposable local Supabase HTTP/Auth/PostgREST
+environment is verified.

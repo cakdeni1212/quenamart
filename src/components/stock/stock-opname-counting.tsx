@@ -8,6 +8,8 @@ import { applyRecordCountIntent, issueRecordCountIntent, type RecordCountActionR
 import { applyOpnameItemIntent, issueOpnameItemIntent, type OpnameItemActionResult, type OpnameItemOperation } from "@/lib/stock/opname-item-action";
 import { applyStockOpnameLifecycleIntent, issueStockOpnameLifecycleIntent, type StockOpnameLifecycleActionResult } from "@/lib/stock/opname-lifecycle-action";
 import { canRetryStockOpnameLifecycle, hasSessionLifecycleInFlight, isSubmitReviewAdvisoryEligible, lifecycleOperationLabel, removeSessionEntries, removeSessionOperationEntry, stockOpnameLifecycleRequestKey, stockOpnameLifecycleStateKey, STOCK_OPNAME_LIFECYCLE_OPERATIONS } from "@/lib/stock/opname-lifecycle-model";
+import { applyStockOpnamePostIntent, issueStockOpnamePostIntent } from "@/lib/stock/opname-post-action";
+import { canRetryStockOpnamePost, isStockOpnamePostAdvisoryEligible, stockOpnamePostRequestKey, stockOpnamePostStateKey, type StockOpnamePostOutcome } from "@/lib/stock/opname-post-model";
 import { transitionItemEditorAfterApply, STOCK_OPNAME_COUNT_FILTERS, STOCK_OPNAME_COUNT_PAGE_SIZE, type OpnameItemEditorState, type StockOpnameCountFilter } from "@/lib/stock/opname-count-model";
 import type { StockOpnameCountData } from "@/lib/stock/opname-count-read";
 
@@ -32,6 +34,7 @@ type PendingRequest =
 type ItemActionResult = RecordCountActionResult | OpnameItemActionResult;
 type PendingLifecycle = { sessionId: string; operation: (typeof STOCK_OPNAME_LIFECYCLE_OPERATIONS)[number]; requestId: string };
 type LifecycleFeedback = { sessionId: string; operation: PendingLifecycle["operation"]; result: StockOpnameLifecycleActionResult };
+type PendingPost = { sessionId: string; operation: "POST_SESSION"; requestId: string };
 
 function countFormat(value: number | string | null) {
   if (value === null) return "—";
@@ -78,7 +81,7 @@ function loadPendingLifecycle(sessionId: string): Map<PendingLifecycle["operatio
   return restored;
 }
 
-export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
+export function StockOpnameCounting({ data, canPost }: { data: StockOpnameCountData; canPost: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = useMemo(() => createClient(), []);
@@ -100,7 +103,12 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
   const [lifecycleReadySessionId, setLifecycleReadySessionId] = useState<string | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState<Map<string, PendingLifecycle["operation"]>>(() => new Map());
   const [lifecycleFeedback, setLifecycleFeedback] = useState<Map<string, LifecycleFeedback>>(() => new Map());
+  const [pendingPostByKey, setPendingPostByKey] = useState<Map<string, PendingPost>>(() => new Map());
+  const [postReadySessionId, setPostReadySessionId] = useState<string | null>(null);
+  const [postBusySessions, setPostBusySessions] = useState<Set<string>>(() => new Set());
+  const [postFeedbackBySession, setPostFeedbackBySession] = useState<Map<string, StockOpnamePostOutcome>>(() => new Map());
   const lifecycleInFlight = useRef(new Set<string>());
+  const postInFlight = useRef(new Set<string>());
   const currentSessionIdRef = useRef(data.session?.id ?? null);
   const backHref = "/stok/opname";
 
@@ -153,6 +161,46 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [data.session?.id]);
+
+  const postSessionId = data.session?.id;
+  const postSessionStatus = data.session?.status;
+  useEffect(() => {
+    const sessionId = postSessionId;
+    if (!sessionId) return;
+    const timer = window.setTimeout(() => {
+      const storageKey = stockOpnamePostRequestKey(sessionId);
+      if (postSessionStatus === "POSTED") {
+        removePendingValue(storageKey);
+        setPendingPostByKey((current) => {
+          const next = new Map(current);
+          next.delete(stockOpnamePostStateKey(sessionId));
+          return next;
+        });
+        setPostReadySessionId(sessionId);
+        return;
+      }
+      let restored: PendingPost | null = null;
+      try {
+        const raw = window.sessionStorage.getItem(storageKey);
+        if (raw) {
+          const value = JSON.parse(raw) as Partial<PendingPost>;
+          if (value.sessionId === sessionId && value.operation === "POST_SESSION"
+              && typeof value.requestId === "string") {
+            restored = { sessionId, operation: "POST_SESSION", requestId: value.requestId };
+          }
+        }
+      } catch { /* a missing browser value cannot authorize a new operation by itself */ }
+      setPendingPostByKey((current) => {
+        const next = new Map(current);
+        const key = stockOpnamePostStateKey(sessionId);
+        if (restored) next.set(key, restored);
+        else next.delete(key);
+        return next;
+      });
+      setPostReadySessionId(sessionId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [postSessionId, postSessionStatus]);
 
   useEffect(() => {
     if (!focusedProduct) return;
@@ -225,7 +273,8 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
     const session = data.session;
     const sessionPending = session && [...pendingLifecycle.values()].some((pending) =>
       pending.sessionId === session.id && canRetryStockOpnameLifecycle(pending.operation, session.status));
-    if (!session || !lifecycleReady || hasSessionLifecycleInFlight(lifecycleInFlight.current, session.id) || sessionPending) return;
+    if (!session || !lifecycleReady || postInFlight.current.has(session.id)
+        || hasSessionLifecycleInFlight(lifecycleInFlight.current, session.id) || sessionPending) return;
     if (operation === "SUBMIT_REVIEW" && !isSubmitReviewAdvisoryEligible(data.progress)) return;
     if (operation === "CANCEL_SESSION" && !window.confirm(
       "Batalkan sesi opname ini? Sesi akan menjadi baca-saja. Riwayat tetap tersimpan dan tidak ada penyesuaian stok yang diposting."
@@ -275,6 +324,7 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
 
   async function retryLifecycleRequest(pending: PendingLifecycle) {
     if (!data.session || pending.sessionId !== data.session.id
+        || postInFlight.current.has(pending.sessionId)
         || hasSessionLifecycleInFlight(lifecycleInFlight.current, pending.sessionId)
         || !canRetryStockOpnameLifecycle(pending.operation, data.session.status)) return;
     const stateKey = stockOpnameLifecycleStateKey(pending.sessionId, pending.operation);
@@ -288,6 +338,110 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
       setLifecycleBusy((current) => {
         const next = new Map(current);
         next.delete(stateKey);
+        return next;
+      });
+    }
+  }
+
+  const applyPostRequest = useCallback(async (pending: PendingPost) => {
+    let result: StockOpnamePostOutcome;
+    try {
+      result = await applyStockOpnamePostIntent({ sessionId: pending.sessionId, requestId: pending.requestId });
+    } catch {
+      result = { kind: "uncertain-failure", requestId: pending.requestId, message: "Hasil posting belum terkonfirmasi. Retry akan memakai ID permintaan yang sama." };
+    }
+    const requestKey = stockOpnamePostRequestKey(pending.sessionId);
+    if (result.kind === "success-posted" || result.kind === "stale-session-changed" || result.kind === "stale-baseline") {
+      removePendingValue(requestKey);
+      setPendingPostByKey((current) => {
+        const next = new Map(current);
+        next.delete(stockOpnamePostStateKey(pending.sessionId));
+        return next;
+      });
+    }
+    setPostFeedbackBySession((current) => new Map(current).set(pending.sessionId, result));
+    if (currentSessionIdRef.current === pending.sessionId
+        && result.kind !== "uncertain-failure") router.refresh();
+  }, [router]);
+
+  async function startPostSession() {
+    const session = data.session;
+    const stateKey = session ? stockOpnamePostStateKey(session.id) : "";
+    if (!session || !canPost || session.status !== "REVIEW" || postReadySessionId !== session.id
+        || pendingPostByKey.has(stateKey) || postInFlight.current.has(session.id)
+        || hasSessionLifecycleInFlight(lifecycleInFlight.current, session.id)
+        || !isStockOpnamePostAdvisoryEligible(data.progress)) return;
+
+    postInFlight.current.add(session.id);
+    if (!window.confirm(
+      "Posting akan menyesuaikan stok sistem berdasarkan hasil opname. Tindakan ini final untuk sesi ini. Jika stok berubah sejak penghitungan, sistem dapat meminta hitung ulang dan tidak memposting penyesuaian. Lanjutkan?"
+    )) {
+      postInFlight.current.delete(session.id);
+      return;
+    }
+    const sessionId = session.id;
+    setPostBusySessions((current) => new Set(current).add(sessionId));
+    setPostFeedbackBySession((current) => {
+      const next = new Map(current);
+      next.delete(sessionId);
+      return next;
+    });
+    try {
+      let issued;
+      try {
+        issued = await issueStockOpnamePostIntent({ sessionId });
+      } catch {
+        issued = { kind: "uncertain-failure" as const, message: "Pembuatan permintaan belum terkonfirmasi. Coba siapkan kembali tindakan yang sama sebelum menerapkan posting." };
+      }
+      if (issued.kind !== "issued") {
+        setPostFeedbackBySession((current) => new Map(current).set(sessionId, {
+          kind: issued.kind,
+          message: issued.message,
+        }));
+        if (issued.kind === "known-rejection" && currentSessionIdRef.current === sessionId) router.refresh();
+        return;
+      }
+      const pending: PendingPost = { sessionId, operation: "POST_SESSION", requestId: issued.requestId };
+      if (!savePendingValue(stockOpnamePostRequestKey(sessionId), JSON.stringify(pending))) {
+        setPostFeedbackBySession((current) => new Map(current).set(sessionId, {
+          kind: "known-rejection",
+          requestId: pending.requestId,
+          message: "ID permintaan tidak dapat disimpan di browser. Belum ada posting yang diterapkan; coba lagi setelah penyimpanan sesi tersedia.",
+        }));
+        return;
+      }
+      setPendingPostByKey((current) => new Map(current).set(stateKey, pending));
+      await applyPostRequest(pending);
+    } finally {
+      postInFlight.current.delete(sessionId);
+      setPostBusySessions((current) => {
+        const next = new Set(current);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  }
+
+  async function retryPostRequest(pending: PendingPost) {
+    if (!data.session || data.session.id !== pending.sessionId || !canPost
+        || !canRetryStockOpnamePost(data.session.status) || postReadySessionId !== pending.sessionId
+        || postInFlight.current.has(pending.sessionId)
+        || hasSessionLifecycleInFlight(lifecycleInFlight.current, pending.sessionId)) return;
+    postInFlight.current.add(pending.sessionId);
+    setPostBusySessions((current) => new Set(current).add(pending.sessionId));
+    setPostFeedbackBySession((current) => {
+      const next = new Map(current);
+      next.delete(pending.sessionId);
+      return next;
+    });
+    try {
+      // Retry applies the exact stored UUID; it never issues a replacement intent.
+      await applyPostRequest(pending);
+    } finally {
+      postInFlight.current.delete(pending.sessionId);
+      setPostBusySessions((current) => {
+        const next = new Set(current);
+        next.delete(pending.sessionId);
         return next;
       });
     }
@@ -435,7 +589,14 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
   const currentLifecycleBusy = data.session
     ? [...lifecycleBusy.entries()].find(([key]) => key.startsWith(`${data.session!.id}:`))?.[1] ?? null
     : null;
-  const lifecycleActionDisabled = !lifecycleReady || currentLifecycleBusy !== null || currentRetryableLifecycleRequests.length > 0;
+  const currentPostBusy = data.session ? postBusySessions.has(data.session.id) : false;
+  const currentPostKey = data.session ? stockOpnamePostStateKey(data.session.id) : "";
+  const currentPendingPost = currentPostKey ? pendingPostByKey.get(currentPostKey) ?? null : null;
+  const currentPostFeedback = data.session ? postFeedbackBySession.get(data.session.id) ?? null : null;
+  const lifecycleActionDisabled = !lifecycleReady || currentLifecycleBusy !== null || currentPostBusy || currentRetryableLifecycleRequests.length > 0;
+  const postActionDisabled = !canPost || !canReviewLifecycle || postReadySessionId !== data.session?.id
+    || currentPostBusy || currentLifecycleBusy !== null || currentRetryableLifecycleRequests.length > 0
+    || !isStockOpnamePostAdvisoryEligible(data.progress);
 
   return <div className="stock-opname-counting">
     <Link className="stock-opname-back" href={backHref}>← Kembali ke daftar opname</Link>
@@ -475,13 +636,28 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
       </section>}
 
       {canReviewLifecycle && <section className="surface-card stock-opname-lifecycle" aria-label="Sesi dalam review">
-        <div><strong>Penghitungan telah diajukan untuk ditinjau.</strong><p>Data item bersifat baca-saja selama sesi berada dalam tahap review.</p></div>
+        <div><strong>Penghitungan telah diajukan untuk ditinjau.</strong><p>Data item bersifat baca-saja selama sesi berada dalam tahap review.</p>
+          {canPost && <><p>Posting akan menyesuaikan stok sistem berdasarkan hasil opname.</p><small>Posting bersifat final untuk sesi ini. Ringkasan kelengkapan tidak memastikan baseline masih terbaru; database memeriksa perubahan stok saat posting.</small></>}</div>
         <button type="button" disabled={lifecycleActionDisabled} onClick={() => void startLifecycleOperation("RETURN_TO_COUNTING")}>
           {currentLifecycleBusy === "RETURN_TO_COUNTING" ? "Mengembalikan…" : "Kembali ke penghitungan"}
         </button>
         <button type="button" className="stock-opname-cancel-session" disabled={lifecycleActionDisabled}
           onClick={() => void startLifecycleOperation("CANCEL_SESSION")}>{currentLifecycleBusy === "CANCEL_SESSION" ? "Membatalkan…" : "Batalkan sesi"}</button>
+        {canPost && !currentPendingPost && <button type="button" className="stock-opname-post-session" disabled={postActionDisabled}
+          onClick={() => void startPostSession()}>{currentPostBusy ? "Memposting…" : "Posting opname"}</button>}
+        {canPost && !isStockOpnamePostAdvisoryEligible(data.progress) && <p className="stock-opname-warning" role="status">Posting dinonaktifkan sampai progress yang valid menunjukkan tidak ada item tersisa atau perlu hitung ulang.</p>}
       </section>}
+
+      {currentPendingPost && <section className="stock-opname-pending-request" role="status" key={stockOpnamePostStateKey(currentPendingPost.sessionId)}>
+        <span>Hasil posting belum terkonfirmasi. ID permintaan tetap tersimpan dan retry tidak akan membuat intent baru.</span>
+        {canPost && canRetryStockOpnamePost(data.session.status) && postReadySessionId === data.session.id
+          ? <button type="button" className="secondary-button" disabled={currentPostBusy || currentLifecycleBusy !== null}
+            onClick={() => void retryPostRequest(currentPendingPost)}>{currentPostBusy ? "Memeriksa hasil…" : "Retry posting tersimpan"}</button>
+          : <span>Retry tidak tersedia pada status sesi saat ini; ID permintaan tetap tersimpan.</span>}
+      </section>}
+      {currentPostFeedback && <p className={currentPostFeedback.kind === "known-rejection" || currentPostFeedback.kind === "uncertain-failure" ? "stock-opname-action-error" : "stock-opname-count-feedback"} role={currentPostFeedback.kind === "known-rejection" || currentPostFeedback.kind === "uncertain-failure" ? "alert" : "status"}>
+        {currentPostFeedback.message}{currentPostFeedback.kind === "success-posted" && currentPostFeedback.movementCount !== undefined ? ` Jumlah SKU yang berubah: ${currentPostFeedback.movementCount}.` : ""}{currentPostFeedback.kind === "stale-baseline" && currentPostFeedback.staleItemCount !== undefined ? ` Item terdampak: ${currentPostFeedback.staleItemCount}.` : ""}
+      </p>}
 
       {data.session.status === "CANCELLED" && <div className="stock-opname-warning" role="status">Sesi dibatalkan dan sekarang baca-saja. Hitungan, pengecualian, dan riwayat tetap tersedia.</div>}
       {data.session.status === "POSTED" && <div className="stock-opname-warning" role="status">Sesi telah selesai dan hanya dapat dilihat.</div>}

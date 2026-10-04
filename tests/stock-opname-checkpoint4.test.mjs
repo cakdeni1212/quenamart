@@ -155,9 +155,10 @@ test('barcode scanning still focuses the included item and never changes its qua
   assert.doesNotMatch(workspace, /physicalQuantity\s*\+\s*1|setQuantity\([^)]*\+\s*1/);
 });
 
-test('only Checkpoint 4 operations were added; later session lifecycle actions remain absent', () => {
+test('item action remains limited to Checkpoint 4 operations while later lifecycle/post controls live elsewhere', () => {
   assert.match(action, /"REBASE_ITEM" \| "REVIEW_EXCEPTION"/);
   assert.doesNotMatch(action, /SUBMIT_REVIEW|RETURN_TO_COUNTING|CANCEL_SESSION|POST_SESSION|RECONCILE_MOVEMENT|REVERSE_MOVEMENT/);
-  assert.doesNotMatch(workspace, /POST_SESSION|RECONCILE_MOVEMENT|REVERSE_MOVEMENT/);
+  assert.match(workspace, /POST_SESSION/);
+  assert.doesNotMatch(workspace, /RECONCILE_MOVEMENT|REVERSE_MOVEMENT/);
   assert.doesNotMatch(action + workspace, /service_role|SUPABASE_SERVICE_ROLE_KEY/);
 });

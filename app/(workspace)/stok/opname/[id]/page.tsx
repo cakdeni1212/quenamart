@@ -20,6 +20,6 @@ export default async function StockOpnameDetailPage({
   const query = await searchParams;
   const data = await readStockOpnameCounting(profile, id, query);
   return <main className="page-content stock-opname-page">
-    <StockOpnameCounting data={data} />
+    <StockOpnameCounting data={data} canPost={profile.role === "OWNER" || profile.role === "ADMIN"} />
   </main>;
 }
