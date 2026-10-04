@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { applyRecordCountIntent, issueRecordCountIntent, type RecordCountActionResult } from "@/lib/stock/opname-count-action";
 import { applyOpnameItemIntent, issueOpnameItemIntent, type OpnameItemActionResult, type OpnameItemOperation } from "@/lib/stock/opname-item-action";
+import { applyStockOpnameLifecycleIntent, issueStockOpnameLifecycleIntent, type StockOpnameLifecycleActionResult } from "@/lib/stock/opname-lifecycle-action";
+import { canRetryStockOpnameLifecycle, hasSessionLifecycleInFlight, isSubmitReviewAdvisoryEligible, lifecycleOperationLabel, removeSessionEntries, removeSessionOperationEntry, stockOpnameLifecycleRequestKey, stockOpnameLifecycleStateKey, STOCK_OPNAME_LIFECYCLE_OPERATIONS } from "@/lib/stock/opname-lifecycle-model";
 import { transitionItemEditorAfterApply, STOCK_OPNAME_COUNT_FILTERS, STOCK_OPNAME_COUNT_PAGE_SIZE, type OpnameItemEditorState, type StockOpnameCountFilter } from "@/lib/stock/opname-count-model";
 import type { StockOpnameCountData } from "@/lib/stock/opname-count-read";
 
@@ -28,6 +30,8 @@ type PendingRequest =
   | { requestId: string; operation: "RECORD_COUNT"; quantity: string }
   | { requestId: string; operation: "REBASE_ITEM" | "REVIEW_EXCEPTION" };
 type ItemActionResult = RecordCountActionResult | OpnameItemActionResult;
+type PendingLifecycle = { sessionId: string; operation: (typeof STOCK_OPNAME_LIFECYCLE_OPERATIONS)[number]; requestId: string };
+type LifecycleFeedback = { sessionId: string; operation: PendingLifecycle["operation"]; result: StockOpnameLifecycleActionResult };
 
 function countFormat(value: number | string | null) {
   if (value === null) return "—";
@@ -59,6 +63,21 @@ function removePendingValue(key: string) {
   try { window.sessionStorage.removeItem(key); } catch { /* replay remains safe if storage cannot be cleared */ }
 }
 
+function loadPendingLifecycle(sessionId: string): Map<PendingLifecycle["operation"], PendingLifecycle> {
+  const restored = new Map<PendingLifecycle["operation"], PendingLifecycle>();
+  for (const operation of STOCK_OPNAME_LIFECYCLE_OPERATIONS) {
+    try {
+      const raw = window.sessionStorage.getItem(stockOpnameLifecycleRequestKey(sessionId, operation));
+      if (!raw) continue;
+      const value = JSON.parse(raw) as Partial<PendingLifecycle>;
+      if (value.sessionId === sessionId && value.operation === operation && typeof value.requestId === "string") {
+        restored.set(operation, { sessionId, operation, requestId: value.requestId });
+      }
+    } catch { /* a missing browser storage value does not block session reads */ }
+  }
+  return restored;
+}
+
 export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -77,7 +96,17 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
   const [pendingByProduct, setPendingByProduct] = useState<Map<string, PendingRequest>>(() => new Map());
   const [busyProduct, setBusyProduct] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ productId: string; result: ItemActionResult } | null>(null);
+  const [pendingLifecycle, setPendingLifecycle] = useState<Map<string, PendingLifecycle>>(() => new Map());
+  const [lifecycleReadySessionId, setLifecycleReadySessionId] = useState<string | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState<Map<string, PendingLifecycle["operation"]>>(() => new Map());
+  const [lifecycleFeedback, setLifecycleFeedback] = useState<Map<string, LifecycleFeedback>>(() => new Map());
+  const lifecycleInFlight = useRef(new Set<string>());
+  const currentSessionIdRef = useRef(data.session?.id ?? null);
   const backHref = "/stok/opname";
+
+  useLayoutEffect(() => {
+    currentSessionIdRef.current = data.session?.id ?? null;
+  }, [data.session?.id]);
 
   useEffect(() => {
     if (!data.session) return;
@@ -106,6 +135,24 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [data.items, data.session]);
+
+  useEffect(() => {
+    const sessionId = data.session?.id;
+    if (!sessionId) return;
+    const timer = window.setTimeout(() => {
+      const restored = loadPendingLifecycle(sessionId);
+      setPendingLifecycle((current) => {
+        const next = new Map(current);
+        for (const [key, pending] of next) if (pending.sessionId === sessionId) next.delete(key);
+        for (const pending of restored.values()) {
+          next.set(stockOpnameLifecycleStateKey(pending.sessionId, pending.operation), pending);
+        }
+        return next;
+      });
+      setLifecycleReadySessionId(sessionId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [data.session?.id]);
 
   useEffect(() => {
     if (!focusedProduct) return;
@@ -157,6 +204,94 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
       router.refresh();
     }
   }, [data.session, router]);
+
+  const applyLifecycleRequest = useCallback(async (pending: PendingLifecycle) => {
+    const stateKey = stockOpnameLifecycleStateKey(pending.sessionId, pending.operation);
+    let result: StockOpnameLifecycleActionResult;
+    try {
+      result = await applyStockOpnameLifecycleIntent({ operation: pending.operation, requestId: pending.requestId });
+    } catch {
+      result = { kind: "error", requestId: pending.requestId, message: "Hasil belum terkonfirmasi. Ulangi tindakan tersimpan dengan tombol retry." };
+    }
+    setLifecycleFeedback((current) => new Map(current).set(stateKey, { ...pending, result }));
+    if (result.kind === "success" || result.kind === "rejected") {
+      removePendingValue(stockOpnameLifecycleRequestKey(pending.sessionId, pending.operation));
+      setPendingLifecycle((current) => removeSessionOperationEntry(current, pending.sessionId, pending.operation));
+      if (currentSessionIdRef.current === pending.sessionId) router.refresh();
+    }
+  }, [router]);
+
+  async function startLifecycleOperation(operation: PendingLifecycle["operation"]) {
+    const session = data.session;
+    const sessionPending = session && [...pendingLifecycle.values()].some((pending) =>
+      pending.sessionId === session.id && canRetryStockOpnameLifecycle(pending.operation, session.status));
+    if (!session || !lifecycleReady || hasSessionLifecycleInFlight(lifecycleInFlight.current, session.id) || sessionPending) return;
+    if (operation === "SUBMIT_REVIEW" && !isSubmitReviewAdvisoryEligible(data.progress)) return;
+    if (operation === "CANCEL_SESSION" && !window.confirm(
+      "Batalkan sesi opname ini? Sesi akan menjadi baca-saja. Riwayat tetap tersimpan dan tidak ada penyesuaian stok yang diposting."
+    )) return;
+
+    const stateKey = stockOpnameLifecycleStateKey(session.id, operation);
+    lifecycleInFlight.current.add(stateKey);
+    setLifecycleBusy((current) => new Map(current).set(stateKey, operation));
+    setLifecycleFeedback((current) => removeSessionEntries(current, session.id));
+    try {
+      let issued: StockOpnameLifecycleActionResult;
+      try {
+        issued = await issueStockOpnameLifecycleIntent({ operation, sessionId: session.id });
+      } catch {
+        setLifecycleFeedback((current) => new Map(current).set(
+          stockOpnameLifecycleStateKey(session.id, operation),
+          { sessionId: session.id, operation, result: { kind: "error", message: "Permintaan belum terkonfirmasi. Coba lagi dengan operasi dan sesi yang sama." } },
+        ));
+        return;
+      }
+      if (issued.kind !== "issued" || !issued.requestId) {
+        setLifecycleFeedback((current) => new Map(current).set(
+          stockOpnameLifecycleStateKey(session.id, operation),
+          { sessionId: session.id, operation, result: issued },
+        ));
+        return;
+      }
+      const pending: PendingLifecycle = { sessionId: session.id, operation, requestId: issued.requestId };
+      if (!savePendingValue(stockOpnameLifecycleRequestKey(session.id, operation), JSON.stringify(pending))) {
+        setLifecycleFeedback((current) => new Map(current).set(
+          stockOpnameLifecycleStateKey(session.id, operation),
+          { ...pending, result: { kind: "error", requestId: issued.requestId, message: "Browser tidak dapat menyimpan ID permintaan untuk retry aman. Aktifkan penyimpanan sesi browser lalu coba lagi." } },
+        ));
+        return;
+      }
+      setPendingLifecycle((current) => new Map(current).set(stockOpnameLifecycleStateKey(session.id, operation), pending));
+      await applyLifecycleRequest(pending);
+    } finally {
+      lifecycleInFlight.current.delete(stateKey);
+      setLifecycleBusy((current) => {
+        const next = new Map(current);
+        next.delete(stateKey);
+        return next;
+      });
+    }
+  }
+
+  async function retryLifecycleRequest(pending: PendingLifecycle) {
+    if (!data.session || pending.sessionId !== data.session.id
+        || hasSessionLifecycleInFlight(lifecycleInFlight.current, pending.sessionId)
+        || !canRetryStockOpnameLifecycle(pending.operation, data.session.status)) return;
+    const stateKey = stockOpnameLifecycleStateKey(pending.sessionId, pending.operation);
+    lifecycleInFlight.current.add(stateKey);
+    setLifecycleBusy((current) => new Map(current).set(stateKey, pending.operation));
+    setLifecycleFeedback((current) => removeSessionOperationEntry(current, pending.sessionId, pending.operation));
+    try {
+      await applyLifecycleRequest(pending);
+    } finally {
+      lifecycleInFlight.current.delete(stateKey);
+      setLifecycleBusy((current) => {
+        const next = new Map(current);
+        next.delete(stateKey);
+        return next;
+      });
+    }
+  }
 
   async function saveCount(item: StockOpnameCountData["items"][number]) {
     if (!data.session) return;
@@ -286,6 +421,21 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
 
   const progressPercent = data.progress?.total ? Math.round((data.progress.accounted / data.progress.total) * 100) : 0;
   const canCount = data.session?.status === "COUNTING";
+  const canReviewLifecycle = data.session?.status === "REVIEW";
+  const lifecycleReady = !data.session || lifecycleReadySessionId === data.session.id;
+  const currentLifecycleRequests = data.session
+    ? [...pendingLifecycle.values()].filter((pending) => pending.sessionId === data.session!.id)
+    : [];
+  const currentRetryableLifecycleRequests = data.session
+    ? currentLifecycleRequests.filter((pending) => canRetryStockOpnameLifecycle(pending.operation, data.session!.status))
+    : [];
+  const currentLifecycleFeedback = data.session
+    ? [...lifecycleFeedback.values()].filter((feedback) => feedback.sessionId === data.session!.id)
+    : [];
+  const currentLifecycleBusy = data.session
+    ? [...lifecycleBusy.entries()].find(([key]) => key.startsWith(`${data.session!.id}:`))?.[1] ?? null
+    : null;
+  const lifecycleActionDisabled = !lifecycleReady || currentLifecycleBusy !== null || currentRetryableLifecycleRequests.length > 0;
 
   return <div className="stock-opname-counting">
     <Link className="stock-opname-back" href={backHref}>← Kembali ke daftar opname</Link>
@@ -293,7 +443,7 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
       <div className="eyebrow">PERSEDIAAN OUTLET · PENCATATAN FISIK</div>
       <div className="page-heading stock-opname-heading">
         <div><h1>Opname #{data.session.id.slice(0, 8).toUpperCase()}</h1><p>{data.session.outletName} · {data.session.scope === "FULL" ? "Opname penuh" : "Opname sebagian"}</p></div>
-        <span className={`stock-opname-status stock-opname-status-${data.session.status.toLowerCase()}`}>{data.session.status === "COUNTING" ? "Menghitung" : data.session.status === "REVIEW" ? "Menunggu posting" : data.session.status === "POSTED" ? "Selesai" : "Dibatalkan"}</span>
+        <span className={`stock-opname-status stock-opname-status-${data.session.status.toLowerCase()}`}>{data.session.status === "COUNTING" ? "Menghitung" : data.session.status === "REVIEW" ? "Sedang direview" : data.session.status === "POSTED" ? "Selesai" : "Dibatalkan"}</span>
       </div>
 
       <section className="surface-card stock-opname-progress" aria-label="Progress opname">
@@ -312,7 +462,38 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
         {data.progressError && data.progress && <p className="stock-opname-warning" role="status">{data.progressError}</p>}
       </section>
 
-      {!canCount && <div className="stock-opname-warning" role="status">Sesi tidak lagi dalam tahap menghitung. Halaman ini hanya menampilkan data.</div>}
+      {canCount && <section className="surface-card stock-opname-lifecycle" aria-label="Kirim opname untuk review">
+        <div><strong>Kelengkapan opname</strong><p>{!data.progress ? "Ringkasan kelengkapan belum tersedia." : isSubmitReviewAdvisoryEligible(data.progress) ? "Semua item sudah dihitung atau diberi pengecualian." : "Masih ada item yang belum selesai dihitung atau perlu hitung ulang."}</p><small>Database memeriksa ulang kelengkapan saat dikirim. Ringkasan ini tidak memeriksa perubahan stok sejak hitungan.</small></div>
+        <button type="button" disabled={!isSubmitReviewAdvisoryEligible(data.progress) || lifecycleActionDisabled}
+          onClick={() => void startLifecycleOperation("SUBMIT_REVIEW")}>
+          {currentLifecycleBusy === "SUBMIT_REVIEW" ? "Mengirim…" : "Ajukan untuk review"}
+        </button>
+        {!data.progress && <p className="stock-opname-warning" role="status">Progress belum tersedia; pengajuan review dinonaktifkan sampai ringkasan berhasil dimuat.</p>}
+        {data.progress && (data.progress.remaining > 0 || data.progress.recountRequired > 0) && <p className="stock-opname-warning" role="status">Selesaikan item tersisa dan hitung ulang yang diperlukan sebelum mengajukan review.</p>}
+        <button type="button" className="stock-opname-cancel-session" disabled={lifecycleActionDisabled}
+          onClick={() => void startLifecycleOperation("CANCEL_SESSION")}>{currentLifecycleBusy === "CANCEL_SESSION" ? "Membatalkan…" : "Batalkan sesi"}</button>
+      </section>}
+
+      {canReviewLifecycle && <section className="surface-card stock-opname-lifecycle" aria-label="Sesi dalam review">
+        <div><strong>Penghitungan telah diajukan untuk ditinjau.</strong><p>Data item bersifat baca-saja selama sesi berada dalam tahap review.</p></div>
+        <button type="button" disabled={lifecycleActionDisabled} onClick={() => void startLifecycleOperation("RETURN_TO_COUNTING")}>
+          {currentLifecycleBusy === "RETURN_TO_COUNTING" ? "Mengembalikan…" : "Kembali ke penghitungan"}
+        </button>
+        <button type="button" className="stock-opname-cancel-session" disabled={lifecycleActionDisabled}
+          onClick={() => void startLifecycleOperation("CANCEL_SESSION")}>{currentLifecycleBusy === "CANCEL_SESSION" ? "Membatalkan…" : "Batalkan sesi"}</button>
+      </section>}
+
+      {data.session.status === "CANCELLED" && <div className="stock-opname-warning" role="status">Sesi dibatalkan dan sekarang baca-saja. Hitungan, pengecualian, dan riwayat tetap tersedia.</div>}
+      {data.session.status === "POSTED" && <div className="stock-opname-warning" role="status">Sesi telah selesai dan hanya dapat dilihat.</div>}
+
+      {currentLifecycleRequests.map((pending) => <section className="stock-opname-pending-request" role="status" key={pending.operation}>
+        <span>Hasil “{lifecycleOperationLabel(pending.operation)}” belum terkonfirmasi. Retry akan memakai ID permintaan yang sama.</span>
+        {data.session && canRetryStockOpnameLifecycle(pending.operation, data.session.status)
+          ? <button type="button" className="secondary-button" disabled={currentLifecycleBusy !== null}
+            onClick={() => void retryLifecycleRequest(pending)}>{currentLifecycleBusy === pending.operation ? "Memeriksa…" : "Cek ulang hasil tersimpan"}</button>
+          : <span>Permintaan tetap tersimpan; retry tidak tersedia pada status sesi saat ini.</span>}
+      </section>)}
+      {currentLifecycleFeedback.map((feedback) => <p key={stockOpnameLifecycleStateKey(feedback.sessionId, feedback.operation)} className={feedback.result.kind === "error" ? "stock-opname-action-error" : "stock-opname-count-feedback"} role={feedback.result.kind === "error" ? "alert" : "status"}><strong>{lifecycleOperationLabel(feedback.operation)}:</strong> {feedback.result.message}</p>)}
 
       {canCount && <form className="surface-card stock-opname-scanner" onSubmit={scanBarcode}>
         <label htmlFor="opname-barcode">Pindai barcode lalu tekan Enter</label>
@@ -356,7 +537,7 @@ export function StockOpnameCounting({ data }: { data: StockOpnameCountData }) {
             {item.exceptionReason && <p className={`stock-opname-exception-note${item.requiresRecount ? " is-stale" : ""}`}>
               {item.requiresRecount ? `Pengecualian sebelumnya (tidak terdata karena perlu hitung ulang): ${item.exceptionReason}` : isException ? `Alasan pengecualian: ${item.exceptionReason}` : `Catatan pengecualian sebelumnya: ${item.exceptionReason}`}
             </p>}
-            {pending && <div className="stock-opname-pending-request" role="status"><span>{pending.operation === "RECORD_COUNT" ? `Permintaan hitung ${pending.quantity}` : pending.operation === "REBASE_ITEM" ? "Permintaan pembaruan baseline" : "Permintaan pengecualian"} belum terkonfirmasi.</span><button type="button" className="secondary-button" disabled={busyProduct === item.productId} onClick={() => void finishApply(item.productId, pending)}>Coba ulang permintaan yang sama</button></div>}
+            {pending && <div className="stock-opname-pending-request" role="status"><span>{pending.operation === "RECORD_COUNT" ? `Permintaan hitung ${pending.quantity}` : pending.operation === "REBASE_ITEM" ? "Permintaan pembaruan baseline" : "Permintaan pengecualian"} belum terkonfirmasi.</span>{canCount ? <button type="button" className="secondary-button" disabled={busyProduct === item.productId} onClick={() => void finishApply(item.productId, pending)}>Coba ulang permintaan yang sama</button> : <span>Retry hitungan hanya tersedia saat sesi berada dalam tahap penghitungan.</span>}</div>}
             {canCount && !pending && !isEditing && <button type="button" className="secondary-button stock-opname-edit-count" disabled={!editable} onClick={() => {
               setItemEditor((current) => ({
                 ...current,

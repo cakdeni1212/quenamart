@@ -94,9 +94,10 @@ test('count display uses the captured opname baseline and generated variance, ne
   assert.doesNotMatch(action + workspace, /\.from\("stock_opname_items"\)\s*\.(insert|update|upsert|delete)|\.from\("stock_balance_projection"\)\s*\.(insert|update|upsert|delete)/i);
 });
 
-test('count action remains scoped to RECORD_COUNT and later lifecycle actions stay absent', () => {
+test('count action remains scoped to RECORD_COUNT and posting remains out of scope', () => {
   assert.match(action, /p_operation_key: "RECORD_COUNT"/);
-  assert.doesNotMatch(action + workspace, /SUBMIT_REVIEW|RETURN_TO_COUNTING|CANCEL_SESSION|POST_SESSION|REVERSE_MOVEMENT|RECONCILE_MOVEMENT/);
+  assert.doesNotMatch(action, /SUBMIT_REVIEW|RETURN_TO_COUNTING|CANCEL_SESSION|POST_SESSION|REVERSE_MOVEMENT|RECONCILE_MOVEMENT/);
+  assert.doesNotMatch(workspace, /POST_SESSION|REVERSE_MOVEMENT|RECONCILE_MOVEMENT/);
 });
 
 test('URL parsing is bounded and invalid filters fall back to ALL; PostgREST search is quoted', () => {
