@@ -56,9 +56,12 @@ test('retry UUID scope includes receipt and POST_PURCHASE_RECEIPT; uncertain app
   const key = receiptPostRetryKey('c0000000-0000-4000-8000-000000000001');
   assert.equal(key, 'quena:purchasing:POST_PURCHASE_RECEIPT:c0000000-0000-4000-8000-000000000001');
   assert.match(editor, /sessionStorage\.setItem\(retryKey, issued\.requestId\)/);
+  assert.match(editor, /sessionStorage\.getItem\(retryKey\)/);
+  assert.match(editor, /if \(retryRequest\).*applyRequest\(retryRequest\)/s);
   assert.match(editor, /applyReceiptPost\(requestId\)/);
   assert.match(editor, /applyRequest\(pendingRequest\)/);
-  assert.match(editor, /Ulangi konfirmasi posting/);
+  assert.match(editor, /Ulangi posting dengan permintaan yang sama/);
+  assert.match(editor, /router\.replace\(`\/pembelian\/barang-masuk\?posted=/);
   assert.match(actions, /apply_purchase_receipt_post_intent/);
   assert.match(actions, /issue_purchase_receipt_post_intent/);
 });
@@ -80,11 +83,12 @@ test('purchasing API avoids direct stock DML and costs, and stock writes share t
   assert.match(reader, /\.range\(\(page - 1\) \* RECEIPT_PAGE_SIZE, page \* RECEIPT_PAGE_SIZE - 1\)/);
 });
 
-test('draft is editable only before post; posted detail is read only and requires confirmation', () => {
+test('draft is editable only before post; posted detail is rendered as a read-only result and posting requires confirmation', () => {
   assert.match(migration, /Posted purchase receipts are immutable/);
   assert.match(migration, /Receipt items are editable only while draft/);
   assert.match(editor, /const readOnly = receipt\.status === "POSTED"/);
-  assert.match(editor, /disabled=\{readOnly\}/);
+  assert.match(editor, /if \(readOnly\) return <section className="purchase-receipt-result surface-card">/);
+  assert.doesNotMatch(editor, /disabled=\{readOnly\}/);
   assert.match(editor, /window\.confirm\("Posting akan menambah stok efektif/);
   assert.match(editor, /accepted_quantity.*bonus_quantity/);
 });

@@ -34,9 +34,12 @@
 
 ## Product modules
 
-- [x] Implement Purchasing Phase 1 supplier master and physical Barang Masuk workflow with controlled stock posting; local PostgreSQL 15 rollback-only matrix passed and fingerprint matched. Migration `20260929220000_purchasing_receipts_v1.sql` is not deployed to production.
-- [ ] Review and separately deploy `20260929220000_purchasing_receipts_v1.sql`; verify production ledger, RPC/grants/RLS, and schema before enabling the workspace. Do not run synthetic production mutations.
-- [ ] Purchasing Phase 2: supplier invoices/nota, payable/tempo, partial payments and allocations, attachments, weighted-average cost recognition/history, and supplier returns. Preserve the separation between physical receipt and financial recognition.
+- [x] Implement and deploy Purchasing Phase 1 supplier master and physical Barang Masuk workflow with controlled stock posting. Migration `20260929220000_purchasing_receipts_v1.sql` and the guarded local PostgreSQL 15 runtime matrix are verified.
+- [x] Implement Purchasing Phase 2 locally: nota/unit prices, separate invoice totals, Cash/Tempo, derived payables, partial payments/allocations, private invoice documents, and OWNER/ADMIN financial UI. Local staging/runtime verification and production preflight/deployment remain pending. No production contact or mutation was made for Phase 2.
+- [ ] Apply migration `20260929230000_purchasing_invoice_payables_v1.sql` to disposable local staging and run the Phase 2 rollback-only finance matrix plus Phase 1 receiving regression. Do not use production for mutation testing.
+- [ ] Review and separately preflight/deploy migration `20260929230000_purchasing_invoice_payables_v1.sql`; verify production ledger, RPC grants/RLS, private storage policies, and schema before enabling nota/Tempo screens.
+- [ ] Implement weighted-average cost / COGS together with the future POS accounting contract; do not update `product_costs.hpp` from Phase 2 receipt/invoice/payment operations.
+- [ ] Implement supplier returns with negative stock movement and separate supplier-credit/payment consequences.
 
 - [x] Complete the read-only production compatibility gate for `20260929180000_stock_foundation_v1.sql`: 25/25 components passed, including 5,103/5,103 eligible bootstrap rows and zero stock-object collisions.
 - [x] Rerun isolated PostgreSQL 15 prepare/apply/single-session runtime verification after the local 180000 change requiring `expected_revision` for `RECORD_COUNT`. User-confirmed staging result: all runtime assertions passed and rolled back; production remains untouched.
@@ -65,6 +68,6 @@
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
 - Implement POS carts, parked transactions, payments, member lookup, receipts, and stock consistency.
 - Implement loyalty rules, member records, reward catalog, redemption, and point ledger.
-- Implement supplier invoices, partial payment history, status logic, attachments, and reminder integration architecture.
+- Design future due-date reminder policy separately; external WhatsApp integration remains out of scope.
 - Implement reports and charts after accounting definitions and role permissions are agreed.
 - Replace dashboard placeholders with authorized data only after source modules and definitions exist.

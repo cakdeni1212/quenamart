@@ -1,0 +1,16 @@
+SELECT md5(
+  (SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||status||':'||draft_revision::text||':'||coalesce(supplier_invoice_total::text,''),E'\n' ORDER BY id),'') FROM public.purchase_invoices)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||invoice_id::text||':'||product_id::text||':'||invoice_quantity::text||':'||purchase_unit_price::text,E'\n' ORDER BY id),'') FROM public.purchase_invoice_items)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(invoice_id::text||':'||receipt_id::text,E'\n' ORDER BY invoice_id,receipt_id),'') FROM public.purchase_invoice_receipts)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||original_amount::text,E'\n' ORDER BY id),'') FROM public.supplier_payables)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||payment_date::text||':'||amount::text||':'||request_id::text,E'\n' ORDER BY id),'') FROM public.supplier_payments)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||payment_id::text||':'||payable_id::text||':'||amount::text,E'\n' ORDER BY id),'') FROM public.supplier_payment_allocations)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||invoice_id::text||':'||event_type||':'||actor_id::text,E'\n' ORDER BY id),'') FROM public.purchase_invoice_events)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||invoice_id::text||':'||storage_path,E'\n' ORDER BY id),'') FROM public.purchase_invoice_documents)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||display_name||':'||is_active::text,E'\n' ORDER BY id),'') FROM public.suppliers)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(request_id::text||':'||operation||':'||coalesce(target_id::text,'')||':'||payload_hash||':'||coalesce(result::text,''),E'\n' ORDER BY request_id),'') FROM public.purchase_financial_requests)
+  ||(SELECT md5(string_agg(id::text||':'||status,E'\n' ORDER BY id)) FROM public.purchase_receipts)
+  ||(SELECT md5(string_agg(product_id::text||':'||outlet_id::text||':'||effective_quantity::text||':'||balance_version::text,E'\n' ORDER BY outlet_id,product_id)) FROM public.stock_balance_projection)
+  ||(SELECT md5(string_agg(product_id::text||':'||outlet_id::text||':'||quantity::text,E'\n' ORDER BY outlet_id,product_id)) FROM public.product_inventory)
+  ||(SELECT count(*)::text||':'||coalesce(string_agg(id::text||':'||request_id::text||':'||product_id::text||':'||quantity_delta::text,E'\n' ORDER BY id),'') FROM public.stock_balance_projection_events)
+) AS purchasing_finance_fingerprint;

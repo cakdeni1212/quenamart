@@ -5,7 +5,14 @@
 - Added normalized supplier management and operational Barang Masuk routes for OWNER/ADMIN/GUDANG. KASIR remains denied; GUDANG receives operational fields only.
 - Added migration `20260929220000_purchasing_receipts_v1.sql` for supplier, draft/posted receipt, item, event, and typed movement-source data plus controlled `POST_PURCHASE_RECEIPT` issue/apply RPCs.
 - Receipt posting adds accepted plus bonus quantity through the existing movement ledger/projection path; rejected/damaged/short quantities do not enter stock. Posting is atomic, retry-safe, and makes the receipt immutable.
-- The guarded local PostgreSQL 15 rollback-only receipt matrix passed and restored its durable fingerprint. Migration 220000 has **not** been deployed to production; production was not contacted or mutated. Invoice/payable/payment, WAC, supplier-return, attachment, and POS work remain deferred.
+- The guarded local PostgreSQL 15 rollback-only receipt matrix passed and restored its durable fingerprint. Migration 220000 is deployed and verified in production. Invoice/payable/payment, WAC, supplier-return, attachment, and POS work remain separate from the Phase 1 stock receipt operation.
+
+## 2026-10-05 — Purchasing Phase 2: simple nota and Cash/Tempo
+
+- Added a separate invoice, payable, payment-allocation, event, and private invoice-document model. Invoice finalization recognizes supplier debt from the printed nota total; payment never changes stock.
+- Added OWNER/ADMIN nota and Tempo Supplier screens for purchase prices, system-versus-supplier total comparison, Cash/Tempo, partial/full payments, derived balances/statuses, receipt links, and private photo/PDF evidence. GUDANG remains limited to operational receipts; KASIR remains denied.
+- Goods-first receiving can be completed and posted without a nota, then linked to a later invoice without reposting stock. Purchase prices are retained for future WAC/COGS work, but HPP is not changed.
+- Migration `20260929230000_purchasing_invoice_payables_v1.sql` is a local implementation candidate and has not been deployed. Staging runtime verification is required before a production preflight; production was not contacted or mutated for this phase.
 
 ## 2026-10-05 — Checkpoint 7 production deployment verified
 

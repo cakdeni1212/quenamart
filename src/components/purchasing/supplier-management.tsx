@@ -21,14 +21,16 @@ function SupplierForm({ supplier }: { supplier?: Supplier }) {
 
 export function SupplierManagement({ suppliers, canManage, search }: { suppliers: Supplier[]; canManage: boolean; search: string }) {
   return <div className="purchase-layout">
-    {canManage && <section className="surface-card purchase-panel"><div className="purchase-section-heading"><div><h2>Supplier baru</h2><p>Tambahkan identitas supplier untuk barang masuk.</p></div></div><SupplierForm /></section>}
-    <section className="surface-card purchase-panel"><div className="purchase-section-heading"><div><h2>Daftar supplier</h2><p>{suppliers.length} supplier ditampilkan · maksimal 100 hasil</p></div></div>
+    {canManage && <section className="surface-card purchase-panel purchase-supplier-create"><div className="purchase-section-heading"><div><span className="eyebrow">DATA OPERASIONAL</span><h2>Supplier baru</h2><p>Tambahkan identitas supplier untuk barang masuk.</p></div></div><SupplierForm /></section>}
+    <section className="surface-card purchase-panel purchase-supplier-directory"><div className="purchase-section-heading"><div><span className="eyebrow">SUPPLIER</span><h2>Daftar supplier</h2><p>{suppliers.length} supplier ditampilkan · maksimal 100 hasil</p></div></div>
       <form className="purchase-search-row purchase-supplier-search" method="get"><input name="q" defaultValue={search} placeholder="Cari nama supplier" /><button type="submit">Cari</button></form>
-      {suppliers.length === 0 ? <div className="purchase-empty">Supplier belum ditemukan.</div> : <ul className="purchase-supplier-list">{suppliers.map((supplier) => <li key={supplier.id}>
+      {suppliers.length === 0 ? <div className="purchase-empty">Supplier belum ditemukan.</div> : <>
+      <div className="purchase-supplier-table-wrap"><table className="purchase-supplier-table"><thead><tr><th>Supplier</th><th>Kode</th><th>Kontak operasional</th><th>Status</th>{canManage && <th>Aksi</th>}</tr></thead><tbody>{suppliers.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.display_name}</strong>{supplier.legal_name && <span>{supplier.legal_name}</span>}</td><td>{supplier.supplier_code}</td><td>{[supplier.contact_name, supplier.phone].filter(Boolean).join(" · ") || "—"}</td><td><span className={`purchase-status ${supplier.is_active ? "purchase-status-posted" : "purchase-status-draft"}`}>{supplier.is_active ? "Aktif" : "Nonaktif"}</span></td>{canManage && <td><details className="purchase-supplier-edit"><summary>Edit</summary><SupplierForm supplier={supplier} /></details></td>}</tr>)}</tbody></table></div>
+      <ul className="purchase-supplier-mobile-list">{suppliers.map((supplier) => <li key={supplier.id}>
         <div><strong>{supplier.display_name}</strong><span>{supplier.supplier_code}{supplier.contact_name ? ` · ${supplier.contact_name}` : ""}{supplier.phone ? ` · ${supplier.phone}` : ""}</span></div>
         <span className={`purchase-status ${supplier.is_active ? "purchase-status-posted" : "purchase-status-draft"}`}>{supplier.is_active ? "Aktif" : "Nonaktif"}</span>
         {canManage && <details><summary>Edit</summary><SupplierForm supplier={supplier} /></details>}
-      </li>)}</ul>}
+      </li>)}</ul></>}
     </section>
   </div>;
 }

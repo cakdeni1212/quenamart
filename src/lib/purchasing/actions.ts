@@ -143,3 +143,94 @@ export async function applyReceiptPost(requestId: string): Promise<{ result: { o
     movementCount: typeof result.movementCount === "number" ? result.movementCount : undefined,
     movementBatchId: typeof result.movementBatchId === "string" ? result.movementBatchId : undefined }, error: null, terminal: true };
 }
+
+export async function createPurchaseInvoiceDraft(supplierId: string, requestId: string) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(supplierId) || !isUuid(requestId)) return { id: null, error: "Akses atau data nota tidak valid." };
+  const outletId = await getActiveStockOutletId();
+  if (!outletId) return { id: null, error: "Outlet aktif belum tersedia." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("purchase_invoice_create_draft", { p_outlet_id: outletId, p_supplier_id: supplierId, p_request_id: requestId });
+  if (error || typeof data !== "string" || !isUuid(data)) return { id: null, error: error ? safeMessage(error) : "Nota belum dapat dibuat." };
+  revalidatePath("/pembelian/nota");
+  return { id: data, error: null };
+}
+
+export async function savePurchaseInvoiceDraft(invoiceId: string, revision: number, input: {
+  invoiceNumber: string; invoiceDate: string; dueDate: string | null; paymentType: "CASH" | "TEMPO";
+  supplierTotal: number; items: Array<{ product_id: string; invoice_quantity: number; purchase_unit_price: number }>;
+}) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(invoiceId) || !Number.isSafeInteger(revision) || !input || !Array.isArray(input.items) || input.items.length > 500) return { error: "Data nota tidak valid." };
+  if (typeof input.invoiceNumber !== "string" || input.invoiceNumber.trim().length > 120
+    || !/^\d{4}-\d{2}-\d{2}$/.test(input.invoiceDate) || (input.dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(input.dueDate))
+    || !["CASH", "TEMPO"].includes(input.paymentType) || !Number.isFinite(input.supplierTotal) || input.supplierTotal < 0
+    || (input.paymentType === "TEMPO" && !input.dueDate)) return { error: "Tanggal, pembayaran, atau total nota belum valid." };
+  if (!input.items.every((item) => isUuid(item.product_id) && Number.isFinite(item.invoice_quantity) && item.invoice_quantity > 0 && Number.isFinite(item.purchase_unit_price) && item.purchase_unit_price >= 0)) return { error: "Periksa kuantitas dan harga setiap barang." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("purchase_invoice_save_draft", {
+    p_invoice_id: invoiceId, p_expected_revision: revision, p_invoice_number: input.invoiceNumber.trim(), p_invoice_date: input.invoiceDate,
+    p_due_date: input.dueDate, p_payment_type: input.paymentType, p_supplier_total: input.supplierTotal,
+    p_items: input.items,
+  });
+  if (error) return { error: safeMessage(error) };
+  const result = data as { ok?: boolean; code?: string } | null;
+  if (!result?.ok) return { error: result?.code === "INVOICE_CHANGED" ? "Nota berubah di sesi lain. Muat ulang sebelum melanjutkan." : "Nota belum tersimpan." };
+  revalidatePath(`/pembelian/nota/${invoiceId}`); revalidatePath("/pembelian/nota"); revalidatePath("/tempo-supplier");
+  return { error: null };
+}
+
+export async function linkPurchaseReceipt(invoiceId: string, receiptId: string, link = true) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(invoiceId) || !isUuid(receiptId)) return { error: "Akses atau data penerimaan tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("purchase_invoice_link_receipt", { p_invoice_id: invoiceId, p_receipt_id: receiptId, p_link: link });
+  if (error) return { error: safeMessage(error) };
+  revalidatePath(`/pembelian/nota/${invoiceId}`); revalidatePath(`/pembelian/barang-masuk/${receiptId}`);
+  return { error: null };
+}
+
+export async function finalizePurchaseInvoice(invoiceId: string, requestId: string, revision: number, input: { initialPaid: number; paymentMethod: string | null; paymentDate: string | null; paymentNote: string | null }) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(invoiceId) || !isUuid(requestId) || !Number.isSafeInteger(revision) || !input || !Number.isFinite(input.initialPaid) || input.initialPaid < 0
+    || (input.paymentMethod !== null && !["CASH", "TRANSFER", "OTHER"].includes(input.paymentMethod))
+    || (input.paymentDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(input.paymentDate))
+    || (input.paymentNote !== null && (typeof input.paymentNote !== "string" || input.paymentNote.trim().length > 300))) return { result: null, error: "Akses atau data finalisasi tidak valid.", terminal: true };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("purchase_invoice_finalize", { p_invoice_id: invoiceId, p_request_id: requestId, p_expected_revision: revision,
+    p_initial_paid: input.initialPaid, p_payment_method: input.paymentMethod, p_payment_date: input.paymentDate, p_payment_note: input.paymentNote });
+  if (error) return { result: null, error: safeMessage(error), terminal: ["42501", "22023", "55000", "P0002"].includes(error.code ?? "") };
+  revalidatePath(`/pembelian/nota/${invoiceId}`); revalidatePath("/pembelian/nota"); revalidatePath("/tempo-supplier"); revalidatePath("/pembelian/barang-masuk");
+  return { result: data as { ok: boolean; code: string; invoiceId?: string; payableId?: string; systemTotal?: number; invoiceTotal?: number; paid?: number } | null, error: null, terminal: true };
+}
+
+export async function recordSupplierPayment(requestId: string, supplierId: string, outletId: string, paymentDate: string, amount: number,
+  method: "CASH" | "TRANSFER" | "OTHER", reference: string | null, allocations: Array<{ payable_id: string; amount: number }>) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(requestId) || !isUuid(supplierId) || !isUuid(outletId) || !Array.isArray(allocations) || allocations.length < 1 || allocations.length > 100) return { result: null, error: "Akses atau data pembayaran tidak valid.", terminal: true };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("purchase_record_supplier_payment", { p_request_id: requestId, p_supplier_id: supplierId, p_outlet_id: outletId,
+    p_payment_date: paymentDate, p_amount: amount, p_payment_method: method, p_reference_note: reference, p_allocations: allocations });
+  if (error) return { result: null, error: safeMessage(error), terminal: ["42501", "22023", "55000", "P0002"].includes(error.code ?? "") };
+  revalidatePath("/tempo-supplier"); revalidatePath("/pembelian/nota");
+  return { result: data as { ok: boolean; code: string; paymentId?: string } | null, error: null, terminal: true };
+}
+
+export async function attachPurchaseInvoiceDocument(invoiceId: string, path: string) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(invoiceId) || typeof path !== "string" || path.length > 300
+    || !new RegExp(`^invoices/${invoiceId}/[0-9a-fA-F-]{36}\\.(jpg|jpeg|png|webp|pdf)$`).test(path)) return { error: "Akses atau dokumen tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("purchase_invoice_attach_document", { p_invoice_id: invoiceId, p_storage_path: path });
+  if (error) return { error: safeMessage(error) };
+  revalidatePath(`/pembelian/nota/${invoiceId}`);
+  return { error: null };
+}
+
+export async function signPurchaseInvoiceDocument(path: string) {
+  const profile = await authorized(true);
+  if (!profile || typeof path !== "string" || path.length > 300 || !path.startsWith("invoices/")) return { url: null };
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage.from("quena-purchasing-invoices").createSignedUrl(path, 60);
+  return { url: error ? null : data.signedUrl };
+}
