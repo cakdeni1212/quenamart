@@ -1,9 +1,20 @@
 # Changelog
 
+## 2026-10-05 — Purchasing Phase 1: supplier master and physical goods receipt
+
+- Added normalized supplier management and operational Barang Masuk routes for OWNER/ADMIN/GUDANG. KASIR remains denied; GUDANG receives operational fields only.
+- Added migration `20260929220000_purchasing_receipts_v1.sql` for supplier, draft/posted receipt, item, event, and typed movement-source data plus controlled `POST_PURCHASE_RECEIPT` issue/apply RPCs.
+- Receipt posting adds accepted plus bonus quantity through the existing movement ledger/projection path; rejected/damaged/short quantities do not enter stock. Posting is atomic, retry-safe, and makes the receipt immutable.
+- The guarded local PostgreSQL 15 rollback-only receipt matrix passed and restored its durable fingerprint. Migration 220000 has **not** been deployed to production; production was not contacted or mutated. Invoice/payable/payment, WAC, supplier-return, attachment, and POS work remain deferred.
+
+## 2026-10-05 — Checkpoint 7 production deployment verified
+
+- Migration `20260929210000_stock_opname_results_v1.sql` was deployed to the verified Quena Mart Supabase project and its official migration ledger, snapshot schema, trigger, RPC, security posture, and legacy POSTED read contract were verified read-only. No production stock/opname mutation was performed.
+
 ## 2026-10-05 — Phase 3C.2 Checkpoint 7D final verification
 
 - Checkpoint 6 POST_SESSION regression and Checkpoint 7B results/snapshot staging matrices passed on guarded local PostgreSQL 15.18. The 5,103-item result RPC returned bounded pages and database-derived search/filter/summary results; measured execution was about 122 ms. Both runtime transactions rolled back and durable fingerprints matched.
-- Checkpoint 7C application tests and full validation passed. Migration `20260929210000_stock_opname_results_v1.sql` is ready for a separate controlled production deployment, but is **not deployed to production**. No production contact or mutation occurred.
+- Checkpoint 7C application tests and full validation passed. At the time of this verification checkpoint, migration 210000 was awaiting its separate controlled production deployment; that deployment was later verified in the entry above.
 
 ## 2026-10-05 — Phase 3C.2 Checkpoint 7C Stock Opname results UI
 
@@ -13,7 +24,7 @@
 ## 2026-10-05 — Phase 3C.2 Checkpoint 7B Stock Opname results foundation
 
 - Added posting-time outlet and item metadata snapshots, deterministic active-barcode selection, immutable after-post snapshots, and no backfill of legacy POSTED sessions.
-- Added the bounded `stock_opname_posted_results_page` RPC with DB-side summary/search/filter/pagination and `POST_SNAPSHOT`, `CURRENT_FALLBACK`, or `LEGACY_UNAVAILABLE` metadata provenance. Local staging runtime passed; production deployment remains pending.
+- Added the bounded `stock_opname_posted_results_page` RPC with DB-side summary/search/filter/pagination and `POST_SNAPSHOT`, `CURRENT_FALLBACK`, or `LEGACY_UNAVAILABLE` metadata provenance. Local staging runtime passed; production deployment is recorded in the later Checkpoint 7 deployment entry.
 
 ## 2026-10-04 — Phase 3C.2 Checkpoint 6 POST_SESSION local runtime passed
 

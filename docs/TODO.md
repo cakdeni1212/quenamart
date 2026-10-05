@@ -34,6 +34,10 @@
 
 ## Product modules
 
+- [x] Implement Purchasing Phase 1 supplier master and physical Barang Masuk workflow with controlled stock posting; local PostgreSQL 15 rollback-only matrix passed and fingerprint matched. Migration `20260929220000_purchasing_receipts_v1.sql` is not deployed to production.
+- [ ] Review and separately deploy `20260929220000_purchasing_receipts_v1.sql`; verify production ledger, RPC/grants/RLS, and schema before enabling the workspace. Do not run synthetic production mutations.
+- [ ] Purchasing Phase 2: supplier invoices/nota, payable/tempo, partial payments and allocations, attachments, weighted-average cost recognition/history, and supplier returns. Preserve the separation between physical receipt and financial recognition.
+
 - [x] Complete the read-only production compatibility gate for `20260929180000_stock_foundation_v1.sql`: 25/25 components passed, including 5,103/5,103 eligible bootstrap rows and zero stock-object collisions.
 - [x] Rerun isolated PostgreSQL 15 prepare/apply/single-session runtime verification after the local 180000 change requiring `expected_revision` for `RECORD_COUNT`. User-confirmed staging result: all runtime assertions passed and rolled back; production remains untouched.
 - [x] Run `tests/staging/run-stock-concurrency-matrix.sh` against guarded local PostgreSQL 15 staging. A/B/E/F/D/G passed with observed real lock overlap. C remains deferred because no generic manual movement/Sale RPC exists; H remains deferred because public multi-product operations sort product IDs internally and expose no reverse-order control. The runner commits synthetic operations, restores stock effects, and retains append-only audit rows.
@@ -55,8 +59,7 @@
 - [ ] Browser mutation smoke testing remains deferred until a disposable local Supabase API/Auth/PostgREST environment is verified.
 - [x] Complete Checkpoint 7B results foundation: posting-time outlet/item snapshots, bounded results RPC, legacy metadata provenance, and local rollback-only matrix.
 - [x] Complete Checkpoint 7C POSTED results UI: RPC-backed summary, search/filters, bounded pagination, exception presentation, lifecycle timeline, and responsive desktop/mobile views.
-- [x] Complete Checkpoint 7D final verification: Checkpoint 6 regression and 5,103-row Checkpoint 7B staging checks passed with matching rollback fingerprints; migration 210000 is ready for controlled deployment and remains undeployed.
-- [ ] Controlled production deployment of `20260929210000_stock_opname_results_v1.sql`; afterward verify the production migration ledger/checksum/RPC and perform a read-only check of an existing legacy POSTED opname result. Do not run synthetic production mutations.
+- [x] Complete Checkpoint 7D final verification and controlled production deployment of `20260929210000_stock_opname_results_v1.sql`; production ledger/schema/RPC/security and an existing legacy POSTED result were verified read-only. No synthetic production mutation was performed.
 - [ ] Future module: generic stock movement history / Kartu Stok combining opname, sales, purchases, returns, transfers, and other movements.
 
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
