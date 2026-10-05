@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-05 — Phase 3C.2 Checkpoint 7D final verification
+
+- Checkpoint 6 POST_SESSION regression and Checkpoint 7B results/snapshot staging matrices passed on guarded local PostgreSQL 15.18. The 5,103-item result RPC returned bounded pages and database-derived search/filter/summary results; measured execution was about 122 ms. Both runtime transactions rolled back and durable fingerprints matched.
+- Checkpoint 7C application tests and full validation passed. Migration `20260929210000_stock_opname_results_v1.sql` is ready for a separate controlled production deployment, but is **not deployed to production**. No production contact or mutation occurred.
+
+## 2026-10-05 — Phase 3C.2 Checkpoint 7C Stock Opname results UI
+
+- Added a read-only POSTED result view with database-derived summary, product/SKU search, result filters, bounded pagination, exception-specific display, metadata provenance notice, and session lifecycle timeline.
+- Result rows use posting-time snapshots where available and historical opname quantities; the responsive desktop/mobile presentation does not read current projection values as historical results.
+
+## 2026-10-05 — Phase 3C.2 Checkpoint 7B Stock Opname results foundation
+
+- Added posting-time outlet and item metadata snapshots, deterministic active-barcode selection, immutable after-post snapshots, and no backfill of legacy POSTED sessions.
+- Added the bounded `stock_opname_posted_results_page` RPC with DB-side summary/search/filter/pagination and `POST_SNAPSHOT`, `CURRENT_FALLBACK`, or `LEGACY_UNAVAILABLE` metadata provenance. Local staging runtime passed; production deployment remains pending.
+
 ## 2026-10-04 — Phase 3C.2 Checkpoint 6 POST_SESSION local runtime passed
 
 - Added OWNER/ADMIN-only POST_SESSION confirmation at `/stok/opname/[id]` through the existing intent/apply RPCs. The app sends only `session_id`; database content hashing, projection checks, movement posting, and atomic stale handling remain authoritative.

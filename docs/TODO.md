@@ -53,6 +53,11 @@
 - [ ] FUTURE INVARIANT — Before authority-period transitions become operational, define and enforce how open opname sessions behave across a period change: cancel, require recount/rebase, or bind them to their original authority period. Current POST_SESSION uses the currently open outlet period; opname items do not capture the period ID.
 - [x] Run `bash tests/staging/run-stock-opname-post-matrix.sh` against disposable local PostgreSQL staging; the rollback fingerprint matched. Never run posting mutation tests against production.
 - [ ] Browser mutation smoke testing remains deferred until a disposable local Supabase API/Auth/PostgREST environment is verified.
+- [x] Complete Checkpoint 7B results foundation: posting-time outlet/item snapshots, bounded results RPC, legacy metadata provenance, and local rollback-only matrix.
+- [x] Complete Checkpoint 7C POSTED results UI: RPC-backed summary, search/filters, bounded pagination, exception presentation, lifecycle timeline, and responsive desktop/mobile views.
+- [x] Complete Checkpoint 7D final verification: Checkpoint 6 regression and 5,103-row Checkpoint 7B staging checks passed with matching rollback fingerprints; migration 210000 is ready for controlled deployment and remains undeployed.
+- [ ] Controlled production deployment of `20260929210000_stock_opname_results_v1.sql`; afterward verify the production migration ledger/checksum/RPC and perform a read-only check of an existing legacy POSTED opname result. Do not run synthetic production mutations.
+- [ ] Future module: generic stock movement history / Kartu Stok combining opname, sales, purchases, returns, transfers, and other movements.
 
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
 - Implement POS carts, parked transactions, payments, member lookup, receipts, and stock consistency.
