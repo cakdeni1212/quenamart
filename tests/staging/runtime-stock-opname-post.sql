@@ -90,6 +90,7 @@ DECLARE
   v_outlet uuid;
   v_a uuid; v_b uuid; v_c uuid; v_d uuid; v_e uuid;
   v_session uuid; v_admin_session uuid; v_changed_session uuid; v_stale_session uuid;
+  v_failed_session uuid;
   v_request uuid; v_retry uuid; v_other_request uuid; v_original_movement uuid;
   v_result jsonb; v_replay jsonb; v_count_result jsonb;
   v_item record;
@@ -113,6 +114,9 @@ DECLARE
   v_replay_balance_event_count_before bigint; v_replay_balance_event_count_after bigint;
   v_replay_posted_event_count_before bigint; v_replay_posted_event_count_after bigint;
   v_replay_projection_before jsonb; v_replay_projection_after jsonb;
+  v_expected_metadata jsonb; v_actual_metadata jsonb;
+  v_replay_metadata_before jsonb; v_replay_metadata_after jsonb;
+  v_outlet_name_before text;
   v_replay_session_status_before text; v_replay_session_status_after text;
   v_inventory_before text; v_inventory_after text;
   v_exception_item uuid;
@@ -143,6 +147,28 @@ BEGIN
       coalesce(i.minimum_quantity::text, '<null>') || ':' || coalesce(i.source_import_row_id::text, '<null>'),
       E'\n' ORDER BY i.product_id), '')) INTO v_inventory_before
     FROM public.product_inventory i WHERE i.outlet_id = v_outlet;
+
+  -- A known rejected POST from COUNTING must not capture posting metadata.
+  v_request := public.issue_stock_operation_intent('CREATE_SESSION', jsonb_build_object(
+    'outlet_id', v_outlet, 'scope_type', 'PARTIAL', 'product_ids', jsonb_build_array(v_e)));
+  v_result := public.apply_stock_operation_intent(v_request);
+  v_failed_session := (v_result->>'sessionId')::uuid;
+  v_request := public.issue_stock_operation_intent('POST_SESSION', jsonb_build_object('session_id', v_failed_session));
+  v_issue_sqlstate := NULL;
+  BEGIN
+    PERFORM public.apply_stock_operation_intent(v_request);
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    v_issue_sqlstate := SQLSTATE;
+  END;
+  IF v_issue_sqlstate IS DISTINCT FROM '22023'
+     OR EXISTS (SELECT 1 FROM public.stock_opname_sessions s
+        WHERE s.id = v_failed_session AND s.posted_metadata_captured_at IS NOT NULL)
+     OR EXISTS (SELECT 1 FROM public.stock_opname_items i
+        WHERE i.session_id = v_failed_session AND i.posted_metadata_captured_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'Rejected COUNTING post captured result metadata';
+  END IF;
+  v_request := public.issue_stock_operation_intent('CANCEL_SESSION', jsonb_build_object('session_id', v_failed_session));
+  PERFORM public.apply_stock_operation_intent(v_request);
 
   -- OWNER multi-item post: negative, positive, zero, and reviewed exception.
   v_request := public.issue_stock_operation_intent('CREATE_SESSION', jsonb_build_object(
@@ -183,6 +209,17 @@ BEGIN
   SELECT p.effective_quantity, p.balance_version INTO STRICT v_before_b, v_version_b
     FROM public.stock_balance_projection p WHERE p.product_id = v_b AND p.outlet_id = v_outlet;
   v_request := public.issue_stock_operation_intent('POST_SESSION', jsonb_build_object('session_id', v_session));
+  SELECT o.name INTO STRICT v_outlet_name_before FROM public.outlets o WHERE o.id = v_outlet;
+  SELECT jsonb_object_agg(i.product_id::text, jsonb_build_object(
+      'product_name', p.name, 'sku', p.sku, 'rack', os.rack_label,
+      'unit', p.unit_label, 'display_barcode', (
+        SELECT b.barcode FROM public.product_barcodes b
+        WHERE b.product_id = p.id AND b.is_active ORDER BY b.created_at, b.id LIMIT 1
+      ))) INTO v_expected_metadata
+    FROM public.stock_opname_items i
+    JOIN public.products p ON p.id = i.product_id
+    LEFT JOIN public.product_outlet_settings os ON os.product_id = p.id AND os.outlet_id = i.outlet_id
+    WHERE i.session_id = v_session;
   v_result := public.apply_stock_operation_intent(v_request);
   IF v_result->>'ok' IS DISTINCT FROM 'true' OR v_result->>'status' IS DISTINCT FROM 'POSTED'
      OR (v_result->>'movementCount')::integer <> 2 OR v_result->>'movementBatchId' IS NULL THEN
@@ -192,6 +229,22 @@ BEGIN
       WHERE s.id = v_session AND s.status = 'POSTED' AND s.approved_by = v_owner
         AND s.approved_at IS NOT NULL AND s.posted_at IS NOT NULL) THEN
     RAISE EXCEPTION 'OWNER post did not record POSTED status and actor/timestamps';
+  END IF;
+  SELECT jsonb_object_agg(i.product_id::text, jsonb_build_object(
+      'product_name', i.posted_product_name_snapshot,
+      'sku', i.posted_sku_snapshot,
+      'rack', i.posted_rack_label_snapshot,
+      'unit', i.posted_unit_label_snapshot,
+      'display_barcode', i.posted_display_barcode_snapshot))
+    INTO v_actual_metadata FROM public.stock_opname_items i WHERE i.session_id = v_session;
+  IF v_actual_metadata IS DISTINCT FROM v_expected_metadata
+     OR (SELECT s.posted_outlet_name_snapshot FROM public.stock_opname_sessions s WHERE s.id = v_session) IS DISTINCT FROM v_outlet_name_before
+     OR (SELECT s.posted_metadata_captured_at FROM public.stock_opname_sessions s WHERE s.id = v_session) IS NULL
+     OR (SELECT count(*) FROM public.stock_opname_items i WHERE i.session_id = v_session
+         AND i.posted_metadata_captured_at = (SELECT s.posted_metadata_captured_at
+           FROM public.stock_opname_sessions s WHERE s.id = v_session)) <> 4 THEN
+    RAISE EXCEPTION 'OWNER post did not snapshot outlet and every item at posting: expected %, actual %',
+      v_expected_metadata, v_actual_metadata;
   END IF;
   IF (SELECT count(*) FROM public.stock_movement_batches b
       WHERE b.id = (v_result->>'movementBatchId')::uuid AND b.outlet_id = v_outlet
@@ -253,6 +306,15 @@ BEGIN
     FROM public.stock_opname_sessions s WHERE s.id = v_session;
   SELECT count(*) INTO v_replay_posted_event_count_before FROM public.stock_opname_session_events e
     WHERE e.session_id = v_session AND e.event_type = 'POSTED';
+  SELECT jsonb_build_object(
+      'outlet_name', s.posted_outlet_name_snapshot,
+      'outlet_captured_at', s.posted_metadata_captured_at,
+      'items', (SELECT jsonb_object_agg(i.product_id::text, jsonb_build_object(
+        'product_name', i.posted_product_name_snapshot, 'sku', i.posted_sku_snapshot,
+        'rack', i.posted_rack_label_snapshot, 'unit', i.posted_unit_label_snapshot,
+        'barcode', i.posted_display_barcode_snapshot, 'captured_at', i.posted_metadata_captured_at))
+        FROM public.stock_opname_items i WHERE i.session_id = s.id))
+    INTO v_replay_metadata_before FROM public.stock_opname_sessions s WHERE s.id = v_session;
   IF v_replay_batch_count_before <> 1 OR v_replay_movement_count_before <> 2
      OR v_replay_balance_event_count_before <> 2 OR v_replay_posted_event_count_before <> 1 THEN
     RAISE EXCEPTION 'OWNER first post did not establish the expected pre-replay batch/movement/event counts';
@@ -277,13 +339,23 @@ BEGIN
     FROM public.stock_opname_sessions s WHERE s.id = v_session;
   SELECT count(*) INTO v_replay_posted_event_count_after FROM public.stock_opname_session_events e
     WHERE e.session_id = v_session AND e.event_type = 'POSTED';
+  SELECT jsonb_build_object(
+      'outlet_name', s.posted_outlet_name_snapshot,
+      'outlet_captured_at', s.posted_metadata_captured_at,
+      'items', (SELECT jsonb_object_agg(i.product_id::text, jsonb_build_object(
+        'product_name', i.posted_product_name_snapshot, 'sku', i.posted_sku_snapshot,
+        'rack', i.posted_rack_label_snapshot, 'unit', i.posted_unit_label_snapshot,
+        'barcode', i.posted_display_barcode_snapshot, 'captured_at', i.posted_metadata_captured_at))
+        FROM public.stock_opname_items i WHERE i.session_id = s.id))
+    INTO v_replay_metadata_after FROM public.stock_opname_sessions s WHERE s.id = v_session;
   IF v_replay_batch_count_after <> v_replay_batch_count_before
      OR v_replay_movement_count_after <> v_replay_movement_count_before
      OR v_replay_balance_event_count_after <> v_replay_balance_event_count_before
      OR v_replay_projection_after IS DISTINCT FROM v_replay_projection_before
      OR v_replay_session_status_after IS DISTINCT FROM v_replay_session_status_before
      OR v_replay_session_status_after IS DISTINCT FROM 'POSTED'
-     OR v_replay_posted_event_count_after <> v_replay_posted_event_count_before THEN
+     OR v_replay_posted_event_count_after <> v_replay_posted_event_count_before
+     OR v_replay_metadata_after IS DISTINCT FROM v_replay_metadata_before THEN
     RAISE EXCEPTION 'OWNER exact post retry changed stock writes, projection state, session status, or POSTED event count';
   END IF;
   SELECT count(*) INTO v_moves_before FROM public.stock_movements m WHERE m.source_reference = v_session::text;
@@ -295,7 +367,15 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '22023' THEN v_denied := true;
   END;
   IF NOT v_denied OR (SELECT count(*) FROM public.stock_movements m WHERE m.source_reference = v_session::text) <> v_moves_before
-     OR (SELECT count(*) FROM public.stock_movement_batches b WHERE b.id = (v_result->>'movementBatchId')::uuid) <> v_batches_before THEN
+     OR (SELECT count(*) FROM public.stock_movement_batches b WHERE b.id = (v_result->>'movementBatchId')::uuid) <> v_batches_before
+     OR (SELECT jsonb_build_object('outlet_name', s.posted_outlet_name_snapshot,
+          'outlet_captured_at', s.posted_metadata_captured_at,
+          'items', (SELECT jsonb_object_agg(i.product_id::text, jsonb_build_object(
+            'product_name', i.posted_product_name_snapshot, 'sku', i.posted_sku_snapshot,
+            'rack', i.posted_rack_label_snapshot, 'unit', i.posted_unit_label_snapshot,
+            'barcode', i.posted_display_barcode_snapshot, 'captured_at', i.posted_metadata_captured_at))
+            FROM public.stock_opname_items i WHERE i.session_id = s.id))
+         FROM public.stock_opname_sessions s WHERE s.id = v_session) IS DISTINCT FROM v_replay_metadata_before THEN
     RAISE EXCEPTION 'New POST_SESSION request after POSTED was not safely rejected';
   END IF;
 
@@ -473,6 +553,8 @@ BEGIN
   IF v_result->>'code' IS DISTINCT FROM 'SESSION_CHANGED'
      OR v_result->>'recountRequired' IS DISTINCT FROM 'true'
      OR NOT EXISTS (SELECT 1 FROM public.stock_opname_sessions s WHERE s.id = v_changed_session AND s.status = 'REVIEW')
+     OR EXISTS (SELECT 1 FROM public.stock_opname_sessions s WHERE s.id = v_changed_session AND s.posted_metadata_captured_at IS NOT NULL)
+     OR EXISTS (SELECT 1 FROM public.stock_opname_items i WHERE i.session_id = v_changed_session AND i.posted_metadata_captured_at IS NOT NULL)
      OR (SELECT count(*) FROM public.stock_movements m WHERE m.source_reference = v_changed_session::text) <> v_moves_before THEN
     RAISE EXCEPTION 'SESSION_CHANGED result changed stock or failed to preserve review state: %', v_result;
   END IF;
@@ -511,6 +593,8 @@ BEGIN
   v_result := public.apply_stock_operation_intent(v_request);
   IF v_result->>'code' IS DISTINCT FROM 'STALE_BASELINE' OR (v_result->>'staleItemCount')::integer <> 1
      OR NOT EXISTS (SELECT 1 FROM public.stock_opname_sessions s WHERE s.id = v_stale_session AND s.status = 'COUNTING')
+     OR EXISTS (SELECT 1 FROM public.stock_opname_sessions s WHERE s.id = v_stale_session AND s.posted_metadata_captured_at IS NOT NULL)
+     OR EXISTS (SELECT 1 FROM public.stock_opname_items i WHERE i.session_id = v_stale_session AND i.posted_metadata_captured_at IS NOT NULL)
      OR NOT EXISTS (SELECT 1 FROM public.stock_opname_items i WHERE i.session_id = v_stale_session AND i.product_id = v_a AND i.requires_recount)
      OR EXISTS (SELECT 1 FROM public.stock_movements m WHERE m.source_reference = v_stale_session::text)
      OR (SELECT count(*) FROM public.stock_movements m WHERE m.source_reference = v_stale_session::text) <> v_moves_before

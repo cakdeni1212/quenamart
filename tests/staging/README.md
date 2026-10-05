@@ -177,3 +177,27 @@ change. The runner never applies a migration, contacts production, or reads
 `.env.local`. No production mutation tests were performed, and browser mutation
 smoke remains deferred until a disposable local Supabase HTTP/Auth/PostgREST
 environment is verified.
+
+Phase 3C.2 Checkpoint 7B adds posting-time product/outlet display snapshots and
+the bounded, read-only `stock_opname_posted_results_page` RPC. After reviewing
+`supabase/migrations/20260929210000_stock_opname_results_v1.sql`, apply only
+that forward migration to the guarded local target with
+`bash tests/staging/apply-stock-opname-results.sh`. Then run
+`bash tests/staging/run-stock-opname-results-matrix.sh`; it first reruns the
+complete rollback-only Checkpoint 6 POST_SESSION regression matrix, then tests
+posting-time snapshots, legacy metadata provenance, result filters/search,
+summary/pagination at 5,103 items, role gates, and unchanged master metadata
+after posting. Both SQL matrices end with ROLLBACK, and the runner compares
+durable stock/opname/master-data fingerprints before and after. This validates
+local PostgreSQL behavior only; it does not contact production or perform
+production mutation tests. Browser mutation smoke remains deferred until a
+disposable local Supabase HTTP/Auth/PostgREST environment is verified.
+The local Checkpoint 7B matrix passed with the Checkpoint 6 post regression
+matrix; both rollback fingerprints matched. The final 5,103-row result RPC
+measurement completed in about 164 ms on the local synthetic fixture. The
+matrix runner verifies the migration checksum and refreshes only the results
+RPC from that pinned source; it does not replay the migration. The existing
+product SKU immutability guard rejects a direct SKU re-key, so that case
+verifies the rejection and confirms result snapshots remain stable; the test
+does not bypass that guard. Migration 210000 is installed only in local staging
+and has not been deployed to production.
