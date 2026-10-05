@@ -118,6 +118,22 @@ export async function readStockOpnameCounting(
   if (!rawSession) return empty(query, "Sesi opname tidak ditemukan atau tidak dapat diakses.");
   const session = rawSession as unknown as SessionRow;
 
+  // POSTED results are read through the dedicated bounded results RPC. Avoid
+  // fetching counting rows, current barcodes/racks, or progress for that view.
+  if (session.status === "POSTED") {
+    return {
+      ...empty(query, null),
+      session: {
+        id: session.id,
+        outletId: session.outlet_id,
+        outletName: session.outlets?.name ?? "Outlet",
+        scope: session.scope_type,
+        status: session.status,
+        createdAt: session.created_at,
+      },
+    };
+  }
+
   let itemRequest = supabase
     .from("stock_opname_items")
     .select("id, product_id, outlet_id, baseline_quantity, physical_quantity, quantity_variance, revision_no, requires_recount, exception_reason, exception_reviewed_by, exception_reviewed_at, products!inner(name, sku)", { count: "exact" })
