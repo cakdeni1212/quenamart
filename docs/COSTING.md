@@ -4,6 +4,16 @@
 
 Migration `20260929250000_costing_wac_foundation_v1.sql` is deployed to Quena Mart production. It installs capability only: no automatic bootstrap, historical backfill, purchase posting integration, invoice adjustment, landed-cost workflow, POS, or COGS posting is included. The production costing tables and authority state remain empty; bootstrap has not been run and WAC is not active.
 
+## Checkpoint A: initial HPP acceptance (local implementation, not deployed)
+
+Forward migration candidate `20260929260000_costing_initial_hpp_acceptance_v1.sql` adds one-time cutover evidence for accepting legacy opening HPP. It is not normal product HPP verification, does not rewrite `product_costs`, `product_cost_history`, or iPos source rows, and does not create costing authority, projection, or bootstrap events. No production deployment or acceptance has occurred.
+
+The bounded OWNER/ADMIN preview classifies current positive-stock products from live database facts. An automatic candidate requires positive HPP within existing bounds/scale; valid current product/outlet/source-row/import-batch/normalization provenance; current HPP equal to normalized source HPP; matching latest cost history; no active HPP override, source conflict, unresolved review, or open HPP cost finding; and a positive selling price strictly above HPP. Missing HPP, explicit zero, and HPP equal to or above selling price are blocking exceptions. Margin at or below 5%, margin above 80%, Rp1 HPP, and a high absolute HPP outlier are separate warnings, not blockers.
+
+OWNER and ADMIN may prepare a deterministic snapshot and resolve exceptions with a required reason. Supported dispositions are `ACCEPT_CURRENT_HPP`, `OPENING_HPP_OVERRIDE`, `LEAVE_UNVALUED`, and `AUTHORITATIVE_ZERO`. Explicit zero is available only when current HPP is actually zero; missing HPP cannot be represented as zero. An opening override is cutover-only evidence and never updates legacy HPP. Final approval is OWNER-only. Approval freezes evidence but does not bootstrap or activate WAC.
+
+Preparation snapshots unit-cost trust evidence, not stock quantity authority. Relevant source/HPP/history/review/override/finding/selling-price changes make the batch stale; quantity-only changes do not. Future bootstrap must take current effective quantity from `stock_balance_projection`. Approved acceptance is one-time evidence and cannot be reused to let later iPos imports reset WAC. Production bootstrap remains explicitly on hold until its separate authorization and integration checkpoints are completed.
+
 ## Three separate authorities
 
 - **Quantity authority:** `stock_balance_projection`. Effective stock quantity is derived from its baseline and controlled movement deltas. Never derive Quena stock from purchase or cost tables.
@@ -19,6 +29,8 @@ Migration `20260929250000_costing_wac_foundation_v1.sql` is deployed to Quena Ma
 - `UNVALUED`: cost is unknown. Inventory value and WAC remain NULL; unknown cost is never converted to zero.
 
 Checkpoint 1 bootstrap uses `stock_balance_projection.effective_quantity` and its balance version. A positive quantity is `VALUED` only when the current outlet-scoped `product_costs.hpp` is non-null, within its existing numeric bounds, tied to a valid current iPos row, and has a latest matching `SUDAH_DIVERIFIKASI` HPP review. A verified zero HPP is allowed as explicit evidence. Otherwise the row is `UNVALUED`. Zero stock has value 0 and NULL WAC, regardless of HPP; this represents no inventory value and does not assert a zero unit cost. A NULL effective quantity remains `UNVALUED` with NULL value/WAC.
+
+Checkpoint A is not yet wired into this bootstrap contract. The deployed bootstrap RPC still uses the stricter normal-review requirement described above; acceptance evidence cannot be consumed until a separately reviewed bootstrap-integration checkpoint changes that contract.
 
 The bootstrap records one `OPENING` event per stock projection row, including outlet/product, the stock authority period and balance version, quantity snapshot, source HPP and review/import provenance when verified, actor, request, and cost version. It does not change stock projection, `product_inventory`, HPP, HPP history, or old purchase/stock records. The request UUID is bound to the authenticated OWNER/ADMIN, operation, outlet, and canonical payload. Exact replay returns the stored result; a new request against an already bootstrapped outlet reports `ALREADY_BOOTSTRAPPED` and never resets cost state.
 

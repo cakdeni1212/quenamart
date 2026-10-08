@@ -1,10 +1,16 @@
 # Changelog
 
+## 2026-10-08 — Costing Engine v1 Initial HPP acceptance Checkpoint A (local implementation)
+
+- Added candidate migration `20260929260000_costing_initial_hpp_acceptance_v1.sql` with bounded manager preview, replay-safe preparation, exception dispositions, stale-fact checks, append-only audit, and OWNER-only approval evidence.
+- Automatic eligibility uses source/HPP/history/review/override/finding/selling-price structure. Margin and absolute outlier signals remain warnings. Opening overrides and explicit zero acceptance do not rewrite legacy HPP or iPos history.
+- Local rollback-only staging coverage passed. The candidate is not deployed; no production acceptance, bootstrap, costing authority, or WAC activation was performed.
+
 ## 2026-10-08 — Costing Engine v1 Checkpoint 1 foundation (deployed capability)
 
 - Deployed and read-only verified forward migration `20260929250000_costing_wac_foundation_v1.sql` for append-only cost batches/events, a separate valuation projection, outlet costing cutover state, controlled replay-safe bootstrap, and bounded OWNER/ADMIN read contract. It does not activate WAC or modify receipt/stock posting.
 - Production costing tables and authority state remain empty. Business baselines were unchanged, and no costing bootstrap was run. The previously verified guarded PostgreSQL 15 local bootstrap/security matrix passed with its rollback fingerprint intact.
-- HPP acceptance remains unresolved: current conservative evidence would leave 3,912 positive-stock rows `UNVALUED`. Production bootstrap remains on hold pending a separately approved HPP verification strategy. Checkpoint 2 and POS/COGS work remain pending.
+- Production HPP acceptance has not been prepared or approved. The deployed bootstrap still requires normal verified-HPP evidence and remains on hold; local Checkpoint A acceptance is not integrated with it. Checkpoint 2 and POS/COGS work remain pending.
 
 ## 2026-10-05 — Purchasing Phase 1: supplier master and physical goods receipt
 

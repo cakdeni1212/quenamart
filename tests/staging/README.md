@@ -71,6 +71,15 @@ retained. If a run stops or refuses due to an unexpected state, stop and inspect
 the staging database; do not rerun a migration manually or alter objects until
 the database contents are reviewed.
 
+Costing HPP acceptance Checkpoint A is validated by
+`bash tests/staging/apply-costing-hpp-acceptance.sh` followed by
+`bash tests/staging/run-costing-hpp-acceptance-matrix.sh`. The runtime matrix
+uses only rollback-scoped HPP, source, review, selling-price, audit-finding,
+acceptance, and permission fixtures; it verifies source/stock/WAC fingerprints
+after rollback. `bash tests/staging/rollback-costing-hpp-acceptance.sh` removes
+only the candidate Checkpoint A schema when its private harness ledger entry is
+the latest. These scripts do not contact Supabase or perform bootstrap.
+
 The Phase 3C.1 single-session and multi-session matrices passed on local
 PostgreSQL 15. Migrations 171000 and 180000 are deployed and ledger-confirmed in
 production. Migration 180000's 34-component read-only post-deployment checker

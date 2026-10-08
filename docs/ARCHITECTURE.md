@@ -71,6 +71,8 @@ Purchasing Phase 2 keeps the employee flow operationally simple while separating
 
 Deployed migration `20260929250000_costing_wac_foundation_v1.sql` establishes append-only cost batches/events, a separate product/outlet valuation projection, outlet cutover state, a replay-safe manager bootstrap operation, and a bounded manager read. It does not change any stock or purchasing writer and does not activate WAC. Production costing tables and authority state are empty; bootstrap has not been run. Until receipt, adjustment, and later sale writers update cost in the same transaction as their stock operations, WAC must not be treated as authoritative. `stock_balance_projection` stays the only quantity authority; `product_inventory` stays the iPos quantity snapshot; `product_costs`/`product_cost_history` stay the legacy HPP reference/history. See [Costing](COSTING.md) for bootstrap, HPP provenance, precision, and future integration rules.
 
+Checkpoint A adds a separate, locally implemented (not production-deployed) one-time HPP acceptance capability. OWNER/ADMIN can preview, prepare, and reason-resolve opening-cost exceptions; only OWNER can approve immutable cutover evidence. The database enforces the role boundary and keeps acceptance separate from product HPP review, source rows, stock quantity, cost projection, and costing authority. Approval is not bootstrap or WAC activation. See [Costing](COSTING.md) for eligibility, warnings, stale-data rules, and the remaining bootstrap hold.
+
 ## Authorization principles
 
 - Use the anon/publishable key with the user's session for normal application operations.
