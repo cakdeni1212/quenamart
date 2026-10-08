@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { applyReceiptPost, issueReceiptPost, resolveReceiptBarcode, saveReceiptDraft, searchReceiptProducts } from "@/lib/purchasing/actions";
-import { formatReceiptQuantity, receiptPostRetryKey, receiptStockQuantity, type ReceiptDraftItem } from "@/lib/purchasing/receipt-model";
+import { applyReceiptPost, cancelReceiptDraft, issueReceiptPost, readPurchasePriceReference, resolveReceiptBarcode, saveReceiptDraft, searchReceiptProducts } from "@/lib/purchasing/actions";
+import { formatReceiptQuantity, receiptInvoiceSubtotal, receiptPostRetryKey, receiptStockQuantity, type ReceiptDraftItem } from "@/lib/purchasing/receipt-model";
 import type { ReceiptDetail } from "@/lib/purchasing/receipt-read";
+import { useReceiptFinance } from "@/components/purchasing/receipt-finance-context";
 
 type Product = { id: string; name: string; sku: string; barcode: string | null };
 type DraftItem = ReceiptDraftItem & { name: string; sku: string; barcode: string | null; unit: string | null };
@@ -18,11 +19,12 @@ function dateTime(value: string | null) {
   return value ? new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Tidak tersedia";
 }
 function sumStock(items: DraftItem[]) { return items.reduce((sum, item) => sum + (receiptStockQuantity(item.accepted_quantity, item.bonus_quantity) ?? 0), 0); }
-function eventLabel(value: string) { return value === "CREATED" ? "Draf dibuat" : value === "POSTED" ? "Barang masuk diposting" : "Draf diperbarui"; }
+function eventLabel(value: string) { return value === "CREATED" ? "Draf dibuat" : value === "POSTED" ? "Barang masuk diposting" : value === "CANCELLED" ? "Draf dibatalkan" : "Draf diperbarui"; }
 
-export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
+export function PurchaseReceiptEditor({ receipt, manager = false, beforePost, afterPost, financeSection, viewOnly = false }: { receipt: ReceiptDetail; manager?: boolean; beforePost?: () => Promise<boolean>; afterPost?: () => Promise<"COMPLETE" | "PENDING" | "SKIPPED">; financeSection?: ReactNode; viewOnly?: boolean }) {
   const router = useRouter();
   const readOnly = receipt.status === "POSTED";
+  const cancelled = receipt.status === "CANCELLED";
   const [items, setItems] = useState<DraftItem[]>(() => receipt.items.map((item) => ({
     product_id: item.product_id, name: item.product?.name ?? "Produk tidak tersedia", sku: item.product?.sku ?? "—",
     barcode: null, unit: item.product?.unit_label ?? null, accepted_quantity: String(item.accepted_quantity),
@@ -38,6 +40,7 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
   const [resultsForQuery, setResultsForQuery] = useState("");
   const [lookupMessage, setLookupMessage] = useState("");
   const [error, setError] = useState("");
+  const [cleanupNotice, setCleanupNotice] = useState("");
   const [isPending, startTransition] = useTransition();
   const [isActionBusy, setIsActionBusy] = useState(false);
   const actionLock = useRef(false);
@@ -45,6 +48,8 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
   const [reviewMode, setReviewMode] = useState(false);
   const retryKey = receiptPostRetryKey(receipt.id);
   const searchRequestNo = useRef(0);
+  const finance = useReceiptFinance();
+  const money = (value: number | null) => value === null ? "—" : new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 2 }).format(value);
 
   useEffect(() => {
     const stored = window.sessionStorage.getItem(retryKey);
@@ -77,6 +82,18 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
     setItems((current) => [...current, { product_id: product.id, name: product.name, sku: product.sku,
       barcode: product.barcode, unit: null, accepted_quantity: "0", bonus_quantity: "0", rejected_quantity: "0",
       short_quantity: null, operational_note: null }]);
+    if (manager && finance) {
+      finance.setLines((current) => current.some((line) => line.productId === product.id) ? current : [...current, {
+        productId: product.id, name: product.name, sku: product.sku, quantity: "0", unitPrice: "", priceSource: null,
+      }]);
+      void readPurchasePriceReference(product.id).then((reference) => {
+        if (reference.price === null) return;
+        const price = String(reference.price);
+        finance.setLines((current) => current.map((line) => line.productId === product.id && !line.unitPrice
+          ? { ...line, unitPrice: price, priceSource: reference.source } : line));
+        try { const key = `quena:purchasing:PRICE_HINTS:${receipt.id}`; const hints = JSON.parse(sessionStorage.getItem(key) ?? "{}") as Record<string, unknown>; hints[product.id] = { price, source: reference.source }; sessionStorage.setItem(key, JSON.stringify(hints)); } catch { /* Price hints are optional UI state. */ }
+      });
+    }
     setHasUnsavedChanges(true); setLookupMessage(`${product.name} ditambahkan.`); setQuery(""); setResults([]);
   }
 
@@ -93,6 +110,7 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
   function updateItem(productId: string, key: keyof DraftItem, value: string) {
     setHasUnsavedChanges(true);
     setItems((current) => current.map((item) => item.product_id === productId ? { ...item, [key]: value } : item));
+    if (manager && finance && key === "accepted_quantity") finance.setLines((current) => current.map((line) => line.productId === productId ? { ...line, quantity: value } : line));
   }
 
   async function saveDraft(event: React.FormEvent<HTMLFormElement>) {
@@ -107,7 +125,14 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
     startTransition(async () => {
       const result = await saveReceiptDraft(receipt.id, receipt.draft_revision, form);
       setError(result.error ?? ""); actionLock.current = false; setIsActionBusy(false);
-      if (!result.error) { setHasUnsavedChanges(false); router.refresh(); }
+      if (!result.error) {
+        setHasUnsavedChanges(false);
+        if (manager && finance && !finance.notaUnavailable) {
+          const invoiceError = await finance.saveInvoiceDraft();
+          if (invoiceError) { setError(`Penerimaan tersimpan, tetapi draf nota belum tersimpan. ${invoiceError}`); return; }
+        }
+        router.refresh();
+      }
     });
   }
 
@@ -115,37 +140,77 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
     if (actionLock.current || readOnly || hasUnsavedChanges || receipt.draft_revision <= 1) return;
     const storedRequest = window.sessionStorage.getItem(retryKey);
     const retryRequest = pendingRequest ?? storedRequest;
-    if (retryRequest) { setPendingRequest(retryRequest); actionLock.current = true; setIsActionBusy(true); await applyRequest(retryRequest); return; }
     actionLock.current = true; setIsActionBusy(true); setError("");
-    const issued = await issueReceiptPost(receipt.id);
-    if (issued.error || !issued.requestId) { setError(issued.error ?? "Permintaan posting belum dapat disiapkan."); actionLock.current = false; setIsActionBusy(false); return; }
-    window.sessionStorage.setItem(retryKey, issued.requestId); setPendingRequest(issued.requestId);
-    await applyRequest(issued.requestId);
+    try {
+      // A retry already has a durable stock request identity. Apply it exactly
+      // as issued without saving or issuing a replacement intent first.
+      if (retryRequest) { setPendingRequest(retryRequest); await applyRequest(retryRequest); return; }
+      if (beforePost && !(await beforePost())) { actionLock.current = false; setIsActionBusy(false); return; }
+      const issued = await issueReceiptPost(receipt.id);
+      if (issued.error || !issued.requestId) { setError(issued.error ?? "Permintaan posting belum dapat disiapkan."); actionLock.current = false; setIsActionBusy(false); return; }
+      window.sessionStorage.setItem(retryKey, issued.requestId); setPendingRequest(issued.requestId);
+      await applyRequest(issued.requestId);
+    } catch {
+      setError("Proses posting belum dapat dipastikan. Coba kembali; permintaan yang sudah dibuat akan digunakan ulang.");
+      actionLock.current = false; setIsActionBusy(false);
+    }
   }
 
   async function applyRequest(requestId: string) {
     setError("");
-    const outcome = await applyReceiptPost(requestId);
-    actionLock.current = false; setIsActionBusy(false);
+    let outcome: Awaited<ReturnType<typeof applyReceiptPost>>;
+    try { outcome = await applyReceiptPost(requestId); }
+    catch {
+      setError("Hasil posting belum dapat dipastikan. Ulangi dengan permintaan yang sama.");
+      actionLock.current = false; setIsActionBusy(false); return;
+    }
     if (outcome.error) {
       if (outcome.terminal) { window.sessionStorage.removeItem(retryKey); setPendingRequest(null); router.refresh(); }
-      setError(outcome.terminal ? outcome.error : `${outcome.error} Jika hasilnya belum pasti, ulangi posting dengan permintaan yang sama.`); return;
+      setError(outcome.terminal ? outcome.error : `${outcome.error} Jika hasilnya belum pasti, ulangi posting dengan permintaan yang sama.`);
+      actionLock.current = false; setIsActionBusy(false); return;
     }
-    if (!outcome.result) { setError("Hasil belum dapat dipastikan. Gunakan percobaan ulang dengan permintaan yang sama."); return; }
+    if (!outcome.result) { setError("Hasil belum dapat dipastikan. Gunakan percobaan ulang dengan permintaan yang sama."); actionLock.current = false; setIsActionBusy(false); return; }
     window.sessionStorage.removeItem(retryKey); setPendingRequest(null);
     if (outcome.result.ok && outcome.result.code === "POSTED") {
-      window.sessionStorage.setItem(`quena:purchasing:POST_SUCCESS:${receipt.id}`, JSON.stringify({ itemCount: items.length, stockAdded: totalStock }));
+      let financial: "COMPLETE" | "PENDING" | "SKIPPED" = "SKIPPED";
+      try { if (afterPost) financial = await afterPost(); } catch { financial = "PENDING"; }
+      window.sessionStorage.removeItem(`quena:purchasing:NOTA_MISSING:${receipt.id}`);
+      window.sessionStorage.setItem(`quena:purchasing:POST_SUCCESS:${receipt.id}`, JSON.stringify({ itemCount: items.length, stockAdded: totalStock, financial }));
       router.replace(`/pembelian/barang-masuk?posted=${encodeURIComponent(receipt.id)}`); return;
     }
     setError(outcome.result.code === "RECEIPT_CHANGED"
       ? "Draf berubah saat proses posting disiapkan. Muat ulang, periksa kembali, lalu siapkan permintaan baru."
       : "Barang masuk tidak dapat diposting. Muat ulang dan periksa status terbaru.");
+    actionLock.current = false; setIsActionBusy(false);
+    router.refresh();
+  }
+
+  async function retryDocumentCleanup() {
+    if (actionLock.current) return;
+    actionLock.current = true; setIsActionBusy(true); setError(""); setCleanupNotice("");
+    const result = await cancelReceiptDraft(receipt.id);
+    actionLock.current = false; setIsActionBusy(false);
+    if (result.error) setError(result.error);
+    else if (result.cleanupPending) setCleanupNotice("Pembersihan dokumen masih tertunda. Silakan coba lagi.");
+    else setCleanupNotice("Dokumen draf berhasil dibersihkan.");
     router.refresh();
   }
 
   const hasPositiveStock = items.some((item) => (receiptStockQuantity(item.accepted_quantity, item.bonus_quantity) ?? 0) > 0);
   const totalStock = sumStock(items);
-  const timeline = <section className={`purchase-timeline ${readOnly ? "purchase-history-timeline" : ""}`}><h2>Riwayat barang masuk</h2><ol>{receipt.events.map((event,index) => <li key={`${event.created_at}-${index}`}><strong>{eventLabel(event.event_type)}</strong><time>{dateTime(event.created_at)}</time></li>)}</ol></section>;
+  const timeline = <section className={`purchase-timeline ${readOnly || cancelled || viewOnly ? "purchase-history-timeline" : ""}`}><h2>Riwayat barang masuk</h2><ol>{receipt.events.map((event,index) => <li key={`${event.created_at}-${index}`}><strong>{eventLabel(event.event_type)}</strong><time>{dateTime(event.created_at)}</time></li>)}</ol></section>;
+
+  if (cancelled || (viewOnly && !readOnly)) return <section className="purchase-receipt-result surface-card">
+    <header className="purchase-detail-header purchase-result-header"><div><div className="eyebrow">{cancelled ? "RIWAYAT PEMBATALAN" : "DRAF BARANG MASUK"}</div><h1>{receipt.receipt_reference}</h1><p>{receipt.supplier?.display_name ?? "Supplier tidak tersedia"} · {receipt.outlet?.name ?? "Outlet tidak tersedia"}</p></div><span className={`purchase-status purchase-status-${cancelled ? "cancelled" : "draft"}`}>{cancelled ? "Dibatalkan" : "Draf"}</span></header>
+    {cancelled ? <div className="purchase-result-meta purchase-cancelled-meta"><div><span>Dibatalkan oleh</span><strong>{receipt.cancelled_by_name}</strong></div><div><span>Tanggal</span><strong>{dateTime(receipt.cancelled_at)}</strong></div><div><span>Diinput oleh</span><strong>{receipt.created_by_name}</strong></div></div>
+      : <div className="purchase-result-meta"><div><span>Tanggal diterima</span><strong>{dateTime(receipt.received_at)}</strong></div><div><span>Diinput oleh</span><strong>{receipt.created_by_name}</strong></div><div><span>Catatan operasional</span><strong>{receipt.operational_note?.trim() || "—"}</strong></div></div>}
+    {cancelled && <p className="purchase-cancelled-note">Draf ini tidak memengaruhi stok. Data dan riwayat pembatalan dipertahankan.</p>}
+    {cancelled && manager && receipt.document_cleanup_pending && <div className="purchase-cancel-cleanup"><span>Penghapusan file nota masih menunggu.</span><button className="purchase-secondary" type="button" disabled={isActionBusy} onClick={() => void retryDocumentCleanup()}>{isActionBusy ? "Mencoba…" : "Coba lagi"}</button></div>}
+    {cleanupNotice && <p className="purchase-cleanup-notice" role="status">{cleanupNotice}</p>}{error && <p className="purchase-action-error" role="alert">{error}</p>}
+    <section className="purchase-result-items"><div className="purchase-items-heading"><div><h2>Barang pada draf</h2></div><strong>{items.length} produk</strong></div>
+      {items.length ? <div className="purchase-posted-table-wrap"><table className="purchase-posted-table"><thead><tr><th>Produk</th><th>Diterima</th><th>Bonus</th><th>Rusak / ditolak</th><th>Kurang</th><th>Stok +</th></tr></thead><tbody>{items.map((item) => <tr key={item.product_id}><td><strong>{item.name}</strong><span>{item.sku}</span></td><td>{formatReceiptQuantity(item.accepted_quantity)}</td><td>{formatReceiptQuantity(item.bonus_quantity)}</td><td>{formatReceiptQuantity(item.rejected_quantity)}</td><td>{item.short_quantity === null ? "—" : formatReceiptQuantity(item.short_quantity)}</td><td>{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity) ?? 0)}</td></tr>)}</tbody></table></div> : <p className="purchase-cancelled-note">Belum ada barang pada draf ini.</p>}
+    </section>{timeline}
+  </section>;
 
   if (readOnly) return <section className="purchase-receipt-result surface-card">
     <header className="purchase-detail-header purchase-result-header"><div><div className="eyebrow">HASIL BARANG MASUK</div><h1>{receipt.receipt_reference}</h1><p>{receipt.supplier?.display_name ?? "Supplier tidak tersedia"} · {receipt.outlet?.name ?? "Outlet tidak tersedia"}</p></div><span className="purchase-status purchase-status-posted">Diposting</span></header>
@@ -155,6 +220,7 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
       <div className="purchase-posted-mobile-list">{items.map((item) => <article key={item.product_id}><header><div><strong>{item.name}</strong><span>{item.sku}{item.unit ? ` · ${item.unit}` : ""}</span></div><b className="purchase-stock-positive">Stok +{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity))}</b></header><dl><div><dt>Diterima</dt><dd>{formatReceiptQuantity(item.accepted_quantity)}</dd></div><div><dt>Bonus</dt><dd>{formatReceiptQuantity(item.bonus_quantity)}</dd></div><div><dt>Rusak / ditolak</dt><dd>{formatReceiptQuantity(item.rejected_quantity)}</dd></div><div><dt>Kurang</dt><dd>{formatReceiptQuantity(item.short_quantity)}</dd></div></dl>{item.operational_note && <p>{item.operational_note}</p>}</article>)}</div>
       <div className="purchase-posted-summary"><span>{items.length} produk</span><strong>Total stok bertambah {formatReceiptQuantity(totalStock)} unit</strong></div>
     </section>
+    {financeSection}
     {timeline}
   </section>;
 
@@ -172,8 +238,9 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
       </section>
       <div className="purchase-items-heading"><div><h2>Produk dalam penerimaan</h2><p>Stok + adalah jumlah diterima ditambah bonus.</p></div><strong>{items.length} produk</strong></div>
       {items.length === 0 ? <div className="purchase-empty">Pindai barcode atau cari produk untuk mulai mencatat penerimaan.</div> : <div className="purchase-receipt-items">{items.map((item) => <article id={`receipt-item-${item.product_id}`} key={item.product_id} className="purchase-receipt-item">
-        <header><div><strong>{item.name}</strong><span>{item.sku}{item.unit ? ` · ${item.unit}` : ""}</span></div><button type="button" className="purchase-remove" onClick={() => { setItems((current) => current.filter((row) => row.product_id !== item.product_id)); setHasUnsavedChanges(true); }}>Hapus</button></header>
+        <header><div><strong>{item.name}</strong><span>{item.sku}{item.unit ? ` · ${item.unit}` : ""}</span></div><button type="button" className="purchase-remove" onClick={() => { setItems((current) => current.filter((row) => row.product_id !== item.product_id)); finance?.setLines((current) => current.filter((line) => line.productId !== item.product_id)); setHasUnsavedChanges(true); }}>Hapus</button></header>
         <div className="purchase-quantity-grid">{([ ["accepted_quantity","Diterima"], ["bonus_quantity","Bonus"], ["rejected_quantity","Rusak / ditolak"], ["short_quantity","Kurang"] ] as const).map(([key,label]) => <label key={key}>{label}<input type="number" min="0" max="99999999999.999" step="0.001" value={item[key] ?? ""} onChange={(event) => updateItem(item.product_id,key,event.target.value)} placeholder={key === "short_quantity" ? "Opsional" : "0"}/></label>)}</div>
+        {manager && finance && !finance.notaUnavailable && (() => { const line = finance.lines.find((row) => row.productId === item.product_id); if (!line) return null; const subtotal = receiptInvoiceSubtotal(line.quantity, line.unitPrice); return <div className="purchase-inline-finance"><label>Harga beli<input type="number" min="0" step="0.01" value={line.unitPrice} onChange={(event) => { const price = event.target.value; finance.setLines((current) => current.map((row) => row.productId === item.product_id ? { ...row, unitPrice: price, priceSource: null } : row)); try { const key = `quena:purchasing:PRICE_HINTS:${receipt.id}`; const hints = JSON.parse(sessionStorage.getItem(key) ?? "{}") as Record<string, unknown>; hints[item.product_id] = { price, source: null }; sessionStorage.setItem(key, JSON.stringify(hints)); } catch { /* Price hints are optional UI state. */ } }} placeholder="Masukkan harga" /></label><div><span>{line.priceSource === "PEMBELIAN_TERAKHIR" ? "Pembelian terakhir" : line.priceSource === "CURRENT_COST_REFERENCE" ? "Referensi biaya saat ini" : line.unitPrice ? "Harga nota" : "Belum ada referensi harga"}</span><strong>Subtotal · {money(subtotal)}</strong></div></div>; })()}
         <p className="purchase-line-total"><span>Stok bertambah</span><strong>+{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity))}</strong></p>
         <label className="purchase-item-note">Catatan item<input maxLength={300} value={item.operational_note ?? ""} onChange={(event) => updateItem(item.product_id,"operational_note",event.target.value)} placeholder="Opsional"/></label>
       </article>)}</div>}
@@ -183,12 +250,13 @@ export function PurchaseReceiptEditor({ receipt }: { receipt: ReceiptDetail }) {
     </form> : <section className="purchase-review-panel">
       <div className="purchase-review-heading"><div><span className="eyebrow">PERIKSA SEBELUM POSTING</span><h2>Review barang masuk</h2><p>Pastikan supplier, tanggal, dan jumlah fisik sudah benar.</p></div><span className="purchase-status purchase-status-draft">Siap ditinjau</span></div>
       <div className="purchase-review-meta"><div><span>Supplier</span><strong>{receipt.supplier?.display_name ?? "Supplier tidak tersedia"}</strong></div><div><span>Tanggal diterima</span><strong>{dateTime(receivedAt ? new Date(receivedAt).toISOString() : receipt.received_at)}</strong></div><div><span>Catatan</span><strong>{note.trim() || "—"}</strong></div></div>
-      <div className="purchase-review-table-wrap"><table className="purchase-review-table"><thead><tr><th>Produk</th><th>Diterima</th><th>Bonus</th><th>Rusak</th><th>Kurang</th><th>Stok +</th></tr></thead><tbody>{items.map((item) => <tr key={item.product_id}><td><strong>{item.name}</strong><span>{item.sku}</span></td><td>{formatReceiptQuantity(item.accepted_quantity)}</td><td>{formatReceiptQuantity(item.bonus_quantity)}</td><td>{formatReceiptQuantity(item.rejected_quantity)}</td><td>{formatReceiptQuantity(item.short_quantity)}</td><td className="purchase-stock-positive">+{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity))}</td></tr>)}</tbody></table></div>
-      <div className="purchase-review-mobile-list">{items.map((item) => <article key={item.product_id}><strong>{item.name}</strong><span>{item.sku}</span><dl><div><dt>Diterima</dt><dd>{formatReceiptQuantity(item.accepted_quantity)}</dd></div><div><dt>Bonus</dt><dd>{formatReceiptQuantity(item.bonus_quantity)}</dd></div><div><dt>Rusak</dt><dd>{formatReceiptQuantity(item.rejected_quantity)}</dd></div><div><dt>Kurang</dt><dd>{formatReceiptQuantity(item.short_quantity)}</dd></div></dl><b className="purchase-stock-positive">Stok +{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity))}</b></article>)}</div>
+      <div className="purchase-review-table-wrap"><table className="purchase-review-table"><thead><tr><th>Produk</th><th>Diterima</th><th>Bonus</th><th>Rusak</th><th>Kurang</th><th>Stok +</th></tr></thead><tbody>{items.map((item) => { const line = manager && !finance?.notaUnavailable ? finance?.lines.find((row) => row.productId === item.product_id) : null; return <tr key={item.product_id}><td><strong>{item.name}</strong><span>{item.sku}</span>{line?.unitPrice && <small>{formatReceiptQuantity(item.accepted_quantity)} × {money(Number(line.unitPrice))} = {money(receiptInvoiceSubtotal(line.quantity,line.unitPrice))}</small>}</td><td>{formatReceiptQuantity(item.accepted_quantity)}</td><td>{formatReceiptQuantity(item.bonus_quantity)}</td><td>{formatReceiptQuantity(item.rejected_quantity)}</td><td>{formatReceiptQuantity(item.short_quantity)}</td><td className="purchase-stock-positive">+{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity))}</td></tr>; })}</tbody></table></div>
+      <div className="purchase-review-mobile-list">{items.map((item) => { const line = manager && !finance?.notaUnavailable ? finance?.lines.find((row) => row.productId === item.product_id) : null; return <article key={item.product_id}><strong>{item.name}</strong><span>{item.sku}</span>{line?.unitPrice && <p>{formatReceiptQuantity(item.accepted_quantity)} × {money(Number(line.unitPrice))} = {money(receiptInvoiceSubtotal(line.quantity,line.unitPrice))}</p>}<dl><div><dt>Diterima</dt><dd>{formatReceiptQuantity(item.accepted_quantity)}</dd></div><div><dt>Bonus</dt><dd>{formatReceiptQuantity(item.bonus_quantity)}</dd></div><div><dt>Rusak</dt><dd>{formatReceiptQuantity(item.rejected_quantity)}</dd></div><div><dt>Kurang</dt><dd>{formatReceiptQuantity(item.short_quantity)}</dd></div></dl><b className="purchase-stock-positive">Stok +{formatReceiptQuantity(receiptStockQuantity(item.accepted_quantity,item.bonus_quantity))}</b></article>; })}</div>
       <div className="purchase-review-total"><span>Total stok bertambah</span><strong>{formatReceiptQuantity(totalStock)} unit</strong></div>
-      {error && <p className="purchase-action-error" role="alert">{error}</p>}
-      <div className="purchase-actions purchase-review-actions"><button type="button" className="purchase-secondary" disabled={isPending || isActionBusy} onClick={() => setReviewMode(false)}>Kembali</button>{pendingRequest ? <button className="purchase-retry" type="button" disabled={isPending || isActionBusy} onClick={() => { if (!actionLock.current) { actionLock.current = true; setIsActionBusy(true); void applyRequest(pendingRequest); } }}>Ulangi posting dengan permintaan yang sama</button> : <button className="purchase-post-button" type="button" disabled={isPending || isActionBusy} onClick={() => { if (window.confirm("Posting akan menambah stok efektif berdasarkan jumlah diterima dan bonus. Penerimaan menjadi permanen dan tidak dapat diedit. Lanjutkan?")) void postReceipt(); }}>Posting Barang Masuk</button>}</div>
     </section>}
+    {financeSection}
+    {reviewMode && error && <p className="purchase-action-error" role="alert">{error}</p>}
+    {reviewMode && <div className="purchase-actions purchase-review-actions"><button type="button" className="purchase-secondary" disabled={isPending || isActionBusy} onClick={() => setReviewMode(false)}>Kembali</button><button className={pendingRequest ? "purchase-retry" : "purchase-post-button"} type="button" disabled={isPending || isActionBusy} onClick={() => { if (pendingRequest || window.confirm("Posting akan menambah stok efektif satu kali. Jika nota sudah lengkap, nota dan pembayaran awal juga dicatat. Barang masuk menjadi permanen. Lanjutkan?")) void postReceipt(); }}>{pendingRequest ? "Ulangi posting dengan permintaan yang sama" : "Posting Barang Masuk"}</button></div>}
     {timeline}
   </section>;
 }

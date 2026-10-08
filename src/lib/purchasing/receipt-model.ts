@@ -12,6 +12,15 @@ export type ReceiptDraftItem = {
   operational_note: string | null;
 };
 
+export type ReceiptInvoiceLine = { productId: string; name: string; sku: string; quantity: string; unitPrice: string; priceSource: "PEMBELIAN_TERAKHIR" | "CURRENT_COST_REFERENCE" | null };
+
+export function receiptInvoiceSubtotal(quantity: unknown, unitPrice: unknown): number | null {
+  if (quantity === "" || unitPrice === "" || quantity === null || unitPrice === null) return null;
+  const qty = Number(quantity); const price = Number(unitPrice);
+  return Number.isFinite(qty) && qty >= 0 && Number.isFinite(price) && price >= 0
+    ? Math.round(qty * price * 100) / 100 : null;
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isUuid(value: unknown): value is string {

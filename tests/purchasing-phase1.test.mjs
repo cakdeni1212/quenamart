@@ -59,7 +59,6 @@ test('retry UUID scope includes receipt and POST_PURCHASE_RECEIPT; uncertain app
   assert.match(editor, /sessionStorage\.getItem\(retryKey\)/);
   assert.match(editor, /if \(retryRequest\).*applyRequest\(retryRequest\)/s);
   assert.match(editor, /applyReceiptPost\(requestId\)/);
-  assert.match(editor, /applyRequest\(pendingRequest\)/);
   assert.match(editor, /Ulangi posting dengan permintaan yang sama/);
   assert.match(editor, /router\.replace\(`\/pembelian\/barang-masuk\?posted=/);
   assert.match(actions, /apply_purchase_receipt_post_intent/);

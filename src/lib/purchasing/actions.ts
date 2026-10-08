@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { canAccessSection } from "@/lib/auth/roles";
 import { getProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveStockOutletId } from "@/lib/stock/opname-create-read";
 import { isUuid, normalizeReceiptDraftItems } from "@/lib/purchasing/receipt-model";
+import { cleanupCancelledInvoiceDocuments } from "@/lib/purchasing/document-cleanup";
 
 export type ActionState = { error: string | null; success?: string | null };
 
@@ -51,27 +52,20 @@ function optionalText(value: FormDataEntryValue | null) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-export async function createReceiptDraft(formData: FormData): Promise<never> {
+export async function createReceiptDraftForSupplier(supplierId: string): Promise<{ receiptId: string | null; error: string | null }> {
   const profile = await authorized();
-  if (!profile) redirect("/dashboard");
-  const supplier = formData.get("supplier_id");
-  const receivedAt = formData.get("received_at");
-  const note = formData.get("operational_note");
-  if (typeof supplier !== "string" || !isUuid(supplier) || typeof receivedAt !== "string" || !receivedAt) redirect("/pembelian/barang-masuk/baru?error=invalid");
-  const receivedDate = new Date(receivedAt);
-  if (!Number.isFinite(receivedDate.getTime())) redirect("/pembelian/barang-masuk/baru?error=invalid");
+  if (!profile || !isUuid(supplierId)) return { receiptId: null, error: "Anda tidak memiliki akses atau supplier tidak valid." };
   const outletId = await getActiveStockOutletId();
-  if (!outletId) redirect("/pembelian/barang-masuk/baru?error=outlet");
+  if (!outletId) return { receiptId: null, error: "Outlet aktif belum tersedia." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("purchase_receipt_create_draft", {
-    p_outlet_id: outletId, p_supplier_id: supplier, p_received_at: receivedDate.toISOString(),
-    p_note: typeof note === "string" && note.trim() ? note.trim() : null,
+    p_outlet_id: outletId, p_supplier_id: supplierId, p_received_at: new Date().toISOString(), p_note: null,
   });
   if (error || typeof data !== "string" || !isUuid(data)) {
-    if (error) safeMessage(error);
-    redirect("/pembelian/barang-masuk/baru?error=create");
+    return { receiptId: null, error: error ? safeMessage(error) : "Barang masuk belum dapat disiapkan." };
   }
-  redirect(`/pembelian/barang-masuk/${data}`);
+  revalidatePath("/pembelian/barang-masuk");
+  return { receiptId: data, error: null };
 }
 
 export async function saveReceiptDraft(receiptId: string, expectedRevision: number, formData: FormData): Promise<ActionState> {
@@ -130,6 +124,32 @@ export async function resolveReceiptBarcode(barcode: string): Promise<{ product:
   return { product: result.product as { id: string; name: string; sku: string; barcode: string | null }, code: "BARCODE_MATCH" };
 }
 
+export async function readPurchasePriceReference(productId: string): Promise<{ price: number | null; source: "PEMBELIAN_TERAKHIR" | "CURRENT_COST_REFERENCE" | null }> {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(productId)) return { price: null, source: null };
+  const supabase = await createClient();
+  const outletId = await getActiveStockOutletId();
+  if (!outletId) return { price: null, source: null };
+
+  // These two existing SELECT contracts are protected by manager-only RLS.
+  // Keep the receipt product search RPC financial-free for GUDANG.
+  const { data: latest } = await supabase.from("purchase_invoice_items")
+    .select("purchase_unit_price,invoice:purchase_invoices!inner(status,finalized_at)")
+    .eq("product_id", productId).eq("invoice.status", "FINALIZED")
+    .order("finalized_at", { referencedTable: "invoice", ascending: false })
+    .order("id", { ascending: false }).limit(1).maybeSingle();
+  const latestPrice = latest?.purchase_unit_price;
+  if (latestPrice !== null && latestPrice !== undefined && Number.isFinite(Number(latestPrice))) {
+    return { price: Number(latestPrice), source: "PEMBELIAN_TERAKHIR" };
+  }
+  const { data: cost } = await supabase.from("product_costs").select("hpp")
+    .eq("product_id", productId).eq("outlet_id", outletId).maybeSingle();
+  const hpp = cost?.hpp;
+  return hpp !== null && hpp !== undefined && Number.isFinite(Number(hpp)) && Number(hpp) > 0
+    ? { price: Number(hpp), source: "CURRENT_COST_REFERENCE" }
+    : { price: null, source: null };
+}
+
 export async function applyReceiptPost(requestId: string): Promise<{ result: { ok: boolean; code: string; movementCount?: number; movementBatchId?: string } | null; error: string | null; terminal: boolean }> {
   const profile = await authorized();
   if (!profile || !isUuid(requestId)) return { result: null, error: "Anda tidak memiliki akses untuk memposting barang masuk.", terminal: true };
@@ -144,6 +164,34 @@ export async function applyReceiptPost(requestId: string): Promise<{ result: { o
     movementBatchId: typeof result.movementBatchId === "string" ? result.movementBatchId : undefined }, error: null, terminal: true };
 }
 
+export async function cancelReceiptDraft(receiptId: string): Promise<{ error: string | null; cleanupPending: boolean }> {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(receiptId)) return { error: "Hanya OWNER atau ADMIN yang dapat membatalkan draf.", cleanupPending: false };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("purchase_receipt_cancel_draft", { p_receipt_id: receiptId });
+  if (error || !data || typeof data !== "object") return { error: error ? safeMessage(error) : "Draf belum dapat dibatalkan.", cleanupPending: false };
+  const result = data as { ok?: unknown; code?: unknown; documents?: unknown; invoiceId?: unknown };
+  if (result.ok !== true || !["CANCELLED", "ALREADY_CANCELLED"].includes(String(result.code))) {
+    return { error: "Draf belum dapat dibatalkan. Muat ulang dan periksa statusnya.", cleanupPending: false };
+  }
+  const documents = Array.isArray(result.documents) ? result.documents as Array<{ documentId?: unknown; storagePath?: unknown }> : [];
+  const invoiceId = typeof result.invoiceId === "string" ? result.invoiceId : "";
+  const cleanupPending = await cleanupCancelledInvoiceDocuments(invoiceId, documents, async (storagePath) => {
+    try {
+      const removal = await createAdminClient().storage.from("quena-purchasing-invoices").remove([storagePath]);
+      return !removal.error;
+    } catch { return false; }
+  }, async (documentId, deleted) => {
+    try {
+      const marked = await createAdminClient().rpc("purchase_invoice_document_cleanup_mark", { p_document_id: documentId, p_deleted: deleted });
+      return !marked.error && marked.data === true;
+    } catch { return false; }
+  });
+  revalidatePath("/pembelian/barang-masuk");
+  revalidatePath(`/pembelian/barang-masuk/${receiptId}`);
+  return { error: null, cleanupPending };
+}
+
 export async function createPurchaseInvoiceDraft(supplierId: string, requestId: string) {
   const profile = await authorized(true);
   if (!profile || !isUuid(supplierId) || !isUuid(requestId)) return { id: null, error: "Akses atau data nota tidak valid." };
@@ -152,6 +200,22 @@ export async function createPurchaseInvoiceDraft(supplierId: string, requestId: 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("purchase_invoice_create_draft", { p_outlet_id: outletId, p_supplier_id: supplierId, p_request_id: requestId });
   if (error || typeof data !== "string" || !isUuid(data)) return { id: null, error: error ? safeMessage(error) : "Nota belum dapat dibuat." };
+  revalidatePath("/pembelian/nota");
+  return { id: data, error: null };
+}
+
+export async function createPurchaseInvoiceDraftForReceipt(receiptId: string, requestId: string) {
+  const profile = await authorized(true);
+  if (!profile || !isUuid(receiptId) || !isUuid(requestId)) return { id: null, error: "Akses atau data nota tidak valid." };
+  const supabase = await createClient();
+  const { data: receipt, error: receiptError } = await supabase.from("purchase_receipts")
+    .select("id,supplier_id,outlet_id").eq("id", receiptId).maybeSingle();
+  if (receiptError || !receipt) return { id: null, error: "Barang masuk tidak dapat dibaca." };
+  const { data, error } = await supabase.rpc("purchase_invoice_create_draft", {
+    p_outlet_id: receipt.outlet_id, p_supplier_id: receipt.supplier_id, p_request_id: requestId,
+  });
+  if (error || typeof data !== "string" || !isUuid(data)) return { id: null, error: error ? safeMessage(error) : "Nota belum dapat dibuat." };
+  revalidatePath(`/pembelian/barang-masuk/${receiptId}`);
   revalidatePath("/pembelian/nota");
   return { id: data, error: null };
 }
@@ -174,10 +238,10 @@ export async function savePurchaseInvoiceDraft(invoiceId: string, revision: numb
     p_items: input.items,
   });
   if (error) return { error: safeMessage(error) };
-  const result = data as { ok?: boolean; code?: string } | null;
+  const result = data as { ok?: boolean; code?: string; revision?: number } | null;
   if (!result?.ok) return { error: result?.code === "INVOICE_CHANGED" ? "Nota berubah di sesi lain. Muat ulang sebelum melanjutkan." : "Nota belum tersimpan." };
   revalidatePath(`/pembelian/nota/${invoiceId}`); revalidatePath("/pembelian/nota"); revalidatePath("/tempo-supplier");
-  return { error: null };
+  return { error: null, revision: typeof result.revision === "number" ? result.revision : revision + 1 };
 }
 
 export async function linkPurchaseReceipt(invoiceId: string, receiptId: string, link = true) {

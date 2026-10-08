@@ -4,11 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveStockOutletId } from "@/lib/stock/opname-create-read";
 import { isUuid } from "@/lib/purchasing/receipt-model";
 
-export type InvoiceSummary = { id: string; invoice_reference: string; invoice_number: string | null; invoice_date: string | null; due_date: string | null; payment_type: "CASH" | "TEMPO" | null; supplier_invoice_total: number | null; status: "DRAFT" | "FINALIZED"; supplier_name: string; paid: number; payment_status: string };
+export type InvoiceSummary = { id: string; invoice_reference: string; invoice_number: string | null; invoice_date: string | null; due_date: string | null; payment_type: "CASH" | "TEMPO" | null; supplier_invoice_total: number | null; status: "DRAFT" | "FINALIZED" | "CANCELLED"; supplier_name: string; paid: number; payment_status: string };
 export type InvoiceDetailData = {
-  header: { id: string; invoice_reference: string; outlet_id: string; supplier_id: string; invoice_number: string | null; invoice_date: string | null; due_date: string | null; payment_type: "CASH" | "TEMPO" | null; supplier_invoice_total: number | null; status: "DRAFT" | "FINALIZED"; created_by: string; created_at: string; updated_by: string; finalized_by: string | null; finalized_at: string | null; draft_revision: number; supplier: { id: string; name: string }; outlet: string; createdByName: string; updatedByName: string; finalizedByName: string };
+  header: { id: string; invoice_reference: string; outlet_id: string; supplier_id: string; invoice_number: string | null; invoice_date: string | null; due_date: string | null; payment_type: "CASH" | "TEMPO" | null; supplier_invoice_total: number | null; status: "DRAFT" | "FINALIZED" | "CANCELLED"; created_by: string; created_at: string; updated_by: string; finalized_by: string | null; finalized_at: string | null; cancelled_by?: string | null; cancelled_at?: string | null; draft_revision: number; supplier: { id: string; name: string }; outlet: string; createdByName: string; updatedByName: string; finalizedByName: string };
   items: Array<{ id: string; productId: string; name: string; sku: string; quantity: number; unitPrice: number; subtotal: number }>;
-  receipts: Array<{ id: string; reference: string; status: "DRAFT" | "POSTED"; receivedAt: string }>;
+  receipts: Array<{ id: string; reference: string; status: "DRAFT" | "POSTED" | "CANCELLED"; receivedAt: string }>;
   payable: null | { id: string; amount: number; paid: number; outstanding: number; status: string };
   payments: Array<{ id: string; date: string; amount: number; method: string; reference: string | null; recordedByName: string; recordedAt: string }>;
   documents: Array<{ id: string; path: string; uploadedAt: string; uploadedByName: string }>;
@@ -74,7 +74,7 @@ export async function readLinkableReceipts(profile: Profile, invoice: InvoiceDet
   if (error) return [];
   return (data ?? []).filter((row) => {
     const links = row.invoiceLink as unknown as Array<{ receipt_id: string }> | null;
-    return !links?.length || links[0]?.receipt_id === row.id;
+    return row.status !== "CANCELLED" && (!links?.length || links[0]?.receipt_id === row.id);
   }).map((row) => ({ id: row.id, reference: row.receipt_reference, status: row.status as "DRAFT" | "POSTED", receivedAt: row.received_at }));
 }
 

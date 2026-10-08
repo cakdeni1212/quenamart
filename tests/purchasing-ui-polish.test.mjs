@@ -36,7 +36,7 @@ test('successful posting returns to the list with a server-verified success summ
   const banner = read('../src/components/purchasing/receipt-post-success.tsx');
   assert.match(banner, /stok bertambah \$\{formatReceiptQuantity\(value\.stockAdded\)\}/);
   assert.match(banner, /Lihat detail/);
-  assert.match(banner, /Barang masuk baru/);
+  assert.match(banner, /Pembelian baru/);
 });
 
 test('receipt editor preserves exact barcode behavior and adds explicit scan/search and review stages', () => {

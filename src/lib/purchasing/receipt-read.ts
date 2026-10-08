@@ -6,10 +6,12 @@ import { getActiveStockOutletId } from "@/lib/stock/opname-create-read";
 import { parseReceiptPage, RECEIPT_PAGE_SIZE } from "@/lib/purchasing/receipt-model";
 
 export type Supplier = { id: string; supplier_code: string; display_name: string; legal_name: string | null; phone: string | null; contact_name: string | null; is_active: boolean };
-export type ReceiptListRow = { id: string; receipt_reference: string; received_at: string; status: "DRAFT" | "POSTED"; created_at: string; created_by: string; supplier: { display_name: string } | null; product_count: number; stock_added: number; created_by_name: string; posted_by_name: string; financial: null | { invoiceNumber: string | null; invoiceTotal: number | null; paymentType: "CASH" | "TEMPO" | null; status: string } };
+export type ReceiptListRow = { id: string; receipt_reference: string; received_at: string; status: "DRAFT" | "POSTED" | "CANCELLED"; created_at: string; created_by: string; supplier: { display_name: string } | null; product_count: number; stock_added: number; created_by_name: string; posted_by_name: string; financial: null | { invoiceNumber: string | null; invoiceTotal: number | null; paymentType: "CASH" | "TEMPO" | null; status: string; documentCleanupPending?: boolean } };
 export type ReceiptDetail = {
-  id: string; receipt_reference: string; outlet_id: string; supplier_id: string; received_at: string; status: "DRAFT" | "POSTED";
+  id: string; receipt_reference: string; outlet_id: string; supplier_id: string; received_at: string; status: "DRAFT" | "POSTED" | "CANCELLED";
   operational_note: string | null; draft_revision: number; created_at: string; posted_at: string | null; posted_by: string | null;
+  cancelled_at: string | null; cancelled_by: string | null; cancelled_by_name: string;
+  document_cleanup_pending: boolean;
   created_by: string; outlet: { name: string } | null; supplier: Supplier | null; created_by_name: string; posted_by_name: string;
   items: Array<{ id: string; product_id: string; accepted_quantity: number | string; bonus_quantity: number | string;
     rejected_quantity: number | string; short_quantity: number | string | null; operational_note: string | null;
@@ -48,7 +50,8 @@ export async function readReceiptList(profile: Profile, pageValue: unknown, filt
   if (!outletId) return { rows: [], page: 1, pages: 0, total: 0, outletName: null, error: "Outlet aktif belum tersedia." };
   const search = typeof filters.search === "string" ? filters.search.trim().slice(0, 80) : "";
   const searchBy = filters.searchBy === "supplier" ? "supplier" : "reference";
-  const status = filters.status === "DRAFT" || filters.status === "POSTED" ? filters.status : "";
+  const manager = profile.role === "OWNER" || profile.role === "ADMIN";
+  const status = filters.status === "DRAFT" || filters.status === "POSTED" || (filters.status === "CANCELLED" && manager) ? filters.status : "";
   const from = validDate(filters.receivedFrom);
   const to = validDate(filters.receivedTo);
   if (from && to && from > to) return { rows: [], page: 1, pages: 0, total: 0, outletName: null, error: "Rentang tanggal tidak valid." };
@@ -63,9 +66,10 @@ export async function readReceiptList(profile: Profile, pageValue: unknown, filt
     supabase.from("outlets").select("name").eq("id", outletId).maybeSingle(),
     (async () => {
       let query = supabase.from("purchase_receipts").select("id,receipt_reference,received_at,status,created_at,created_by,supplier:suppliers(display_name)", { count: "exact" }).eq("outlet_id", outletId);
+      if (status) query = query.eq("status", status);
+      else query = query.neq("status", "CANCELLED");
       if (search && searchBy === "reference") query = query.ilike("receipt_reference", `%${search}%`);
       if (supplierIds) query = supplierIds.length ? query.in("supplier_id", supplierIds) : query.eq("supplier_id", "00000000-0000-0000-0000-000000000000");
-      if (status) query = query.eq("status", status);
       if (from) query = query.gte("received_at", `${from}T00:00:00+07:00`);
       if (to) { const next = new Date(`${to}T00:00:00+07:00`); next.setDate(next.getDate() + 1); query = query.lt("received_at", next.toISOString()); }
       return query.order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * RECEIPT_PAGE_SIZE, page * RECEIPT_PAGE_SIZE - 1);
@@ -85,7 +89,7 @@ export async function readReceiptList(profile: Profile, pageValue: unknown, filt
     console.error("[purchasing] receipt list enrichment failed", { code: enrich.error.code });
     return { rows: [], page: normalizedPage, pages, total, outletName: outlet?.name ?? null, error: "Ringkasan barang masuk belum dapat dimuat." };
   }
-  const details = (enrich.data ?? {}) as Record<string, { productCount?: number; stockAdded?: number; createdByName?: string; postedByName?: string; financial?: ReceiptListRow["financial"] }>;
+  const details = (enrich.data ?? {}) as Record<string, { productCount?: number; stockAdded?: number; createdByName?: string; postedByName?: string; cancelledByName?: string; financial?: ReceiptListRow["financial"] }>;
   return { rows: baseRows.map((row) => {
     const detail = details[row.id];
     return { ...row, product_count: detail?.productCount ?? 0, stock_added: detail?.stockAdded ?? 0,
@@ -97,7 +101,7 @@ export async function readReceiptDetail(profile: Profile, receiptId: string): Pr
   if (!canAccessSection(profile.role, "pembelian")) return null;
   const supabase = await createClient();
   const { data, error } = await supabase.from("purchase_receipts")
-    .select("id,receipt_reference,outlet_id,supplier_id,received_at,status,operational_note,draft_revision,created_at,posted_at,posted_by,created_by,outlet:outlets(name),supplier:suppliers(id,supplier_code,display_name,legal_name,phone,contact_name,is_active),items:purchase_receipt_items(id,product_id,accepted_quantity,bonus_quantity,rejected_quantity,short_quantity,operational_note,product:products(name,sku,unit_label)),events:purchase_receipt_events(event_type,actor_id,created_at,note)")
+    .select("id,receipt_reference,outlet_id,supplier_id,received_at,status,operational_note,draft_revision,created_at,posted_at,posted_by,cancelled_by,cancelled_at,created_by,outlet:outlets(name),supplier:suppliers(id,supplier_code,display_name,legal_name,phone,contact_name,is_active),items:purchase_receipt_items(id,product_id,accepted_quantity,bonus_quantity,rejected_quantity,short_quantity,operational_note,product:products(name,sku,unit_label)),events:purchase_receipt_events(event_type,actor_id,created_at,note)")
     .eq("id", receiptId).maybeSingle();
   if (error) {
     console.error("[purchasing] receipt detail read failed", { code: error.code });
@@ -105,8 +109,8 @@ export async function readReceiptDetail(profile: Profile, receiptId: string): Pr
   }
   if (!data) return null;
   const { data: names } = await supabase.rpc("purchase_receipt_actor_names", { p_receipt_id: receiptId });
-  const actorNames = names && typeof names === "object" ? names as { createdByName?: string; postedByName?: string } : {};
-  return { ...(data as unknown as ReceiptDetail), created_by_name: actorNames.createdByName ?? "Pengguna tidak tersedia", posted_by_name: actorNames.postedByName ?? "Pengguna tidak tersedia" };
+  const actorNames = names && typeof names === "object" ? names as { createdByName?: string; postedByName?: string; cancelledByName?: string; financial?: { documentCleanupPending?: boolean } | null } : {};
+  return { ...(data as unknown as ReceiptDetail), created_by_name: actorNames.createdByName ?? "Pengguna tidak tersedia", posted_by_name: actorNames.postedByName ?? "Pengguna tidak tersedia", cancelled_by_name: actorNames.cancelledByName ?? "Pengguna tidak tersedia", document_cleanup_pending: actorNames.financial?.documentCleanupPending === true };
 }
 
 export async function readProductSearch(search: string) {
