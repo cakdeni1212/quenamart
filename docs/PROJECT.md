@@ -19,7 +19,7 @@ Quena Mart is a Next.js 16.3.6 App Router application using TypeScript, Tailwind
 
 - [Architecture](ARCHITECTURE.md): routing, sessions, role checks, and security boundaries.
 - [Database](DATABASE.md): current Supabase schema and future data guidance.
-- [iPos import](IPOS_IMPORT.md), [product audit](AUDIT_RULES.md), [POS](POS.md), [loyalty](LOYALTY.md), [supplier terms](TEMPO_SUPPLIER.md), and [reporting](REPORTING.md): upcoming requirements.
+- [iPos import](IPOS_IMPORT.md), [product audit](AUDIT_RULES.md), [POS](POS.md), [loyalty](LOYALTY.md), [supplier terms](TEMPO_SUPPLIER.md), [reporting](REPORTING.md), and [Costing Engine](COSTING.md): data contracts and future integration guidance.
 - [Features](FEATURES.md): implemented and planned scope.
 - [Changelog](CHANGELOG.md): shipped changes.
 - [TODO](TODO.md): next work and open decisions.

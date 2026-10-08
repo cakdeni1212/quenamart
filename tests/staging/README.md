@@ -201,3 +201,20 @@ product SKU immutability guard rejects a direct SKU re-key, so that case
 verifies the rejection and confirms result snapshots remain stable; the test
 does not bypass that guard. Migration 210000 is installed only in local staging
 and has not been deployed to production.
+
+For Costing Engine v1 Checkpoint 1, review
+`supabase/migrations/20260929250000_costing_wac_foundation_v1.sql`, then run
+`bash tests/staging/apply-costing-wac-foundation.sh`. It requires the exact
+guarded local migration chain through 240000 and applies only 250000 to
+`localhost:5432/quena_stock_staging`. Then run
+`bash tests/staging/run-costing-wac-foundation-matrix.sh`. The runtime cases
+use existing synthetic stock fixtures, insert temporary verification evidence
+and adjust only fixture state inside one rollback-only transaction, then
+assert the durable stock projection, product_inventory, product_costs,
+product_cost_history, iPos rows, and review fingerprint is restored. It tests
+verified-HPP opening value, positive stock with missing HPP as UNVALUED, zero
+stock semantics, exact replay and second-bootstrap refusal, manager versus
+GUDANG/KASIR reads and direct writes, ledger immutability, event/version links,
+precision, and negative valuation rejection. This foundation does not activate
+WAC or alter receipt stock posting. No production target, data, or credentials
+are used.

@@ -35,10 +35,12 @@
 ## Product modules
 
 - [x] Implement and deploy Purchasing Phase 1 supplier master and physical Barang Masuk workflow with controlled stock posting. Migration `20260929220000_purchasing_receipts_v1.sql` and the guarded local PostgreSQL 15 runtime matrix are verified.
-- [x] Implement Purchasing Phase 2 locally: nota/unit prices, separate invoice totals, Cash/Tempo, derived payables, partial payments/allocations, private invoice documents, and OWNER/ADMIN financial UI. Local staging/runtime verification and production preflight/deployment remain pending. No production contact or mutation was made for Phase 2.
-- [ ] Apply migration `20260929230000_purchasing_invoice_payables_v1.sql` to disposable local staging and run the Phase 2 rollback-only finance matrix plus Phase 1 receiving regression. Do not use production for mutation testing.
-- [ ] Review and separately preflight/deploy migration `20260929230000_purchasing_invoice_payables_v1.sql`; verify production ledger, RPC grants/RLS, private storage policies, and schema before enabling nota/Tempo screens.
-- [ ] Implement weighted-average cost / COGS together with the future POS accounting contract; do not update `product_costs.hpp` from Phase 2 receipt/invoice/payment operations.
+- [x] Complete and deploy Purchasing Phase 2: nota/unit prices, separate invoice totals, Cash/Tempo, derived payables, partial payments/allocations, private invoice documents, and OWNER/ADMIN financial UI. Deployment was read-only verified against the Quena Mart production project; synthetic production mutation tests were not performed.
+- [x] Apply `20260929250000_costing_wac_foundation_v1.sql` to guarded local staging and deploy/verify its capability-only schema in Quena Mart production. Production bootstrap was not run and costing authority remains inactive.
+- [ ] DO NOT RUN PRODUCTION COSTING BOOTSTRAP YET. Read-only simulation found 3,912 positive effective-stock rows and 0 rows satisfying the conservative verified-HPP rule; the current rule would bootstrap all 3,912 as `UNVALUED`. Separately design and approve an initial HPP acceptance/verification strategy before any production bootstrap. Do not weaken the verification rule or mark unreviewed HPP as verified.
+- [ ] Implement Checkpoint 2 receipt valuation integrated atomically with controlled receipt posting; keep outlet status `BOOTSTRAP_READY` until all stock writers are integrated.
+- [ ] Implement invoice adjustment and landed-cost allocation as append-only cost events; do not change supplier payable or stock quantity.
+- [ ] Design and implement POS sale/COGS, returns, and late-cost consumed-versus-on-hand behavior before activating WAC or launching native POS. Do not update `product_costs.hpp` from purchasing operations.
 - [ ] Implement supplier returns with negative stock movement and separate supplier-credit/payment consequences.
 
 - [x] Complete the read-only production compatibility gate for `20260929180000_stock_foundation_v1.sql`: 25/25 components passed, including 5,103/5,103 eligible bootstrap rows and zero stock-object collisions.
