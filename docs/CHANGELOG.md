@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-09 — Costing C3A local implementation
+
+- Added forward-only local candidate migration `20260929290000_costing_purchase_receipt_acquisition_v1.sql` for protected receipt-item estimate revisions, explicit partial/provisional/unvalued projection fields, source-event uniqueness, and atomic receipt-post costing gated on `WAC_ACTIVE`.
+- Receipt draft saves retain item identity for retained products and tombstone removed-item estimate evidence. Estimate, posting, and costing operations are database-controlled and actor-bound; GUDANG receives no financial values.
+- Guarded PostgreSQL 15 staging C3A matrix passed and rolled back with durable state fingerprint unchanged. The migration is not deployed; bootstrap and WAC activation were not run.
+
 ## 2026-10-08 — Costing Engine v1 Initial HPP acceptance Checkpoint B (local UI)
 
 - Added protected `/hpp-awal` workspace for OWNER/ADMIN with live bounded preview, server-side search/pagination, explicit preparation, exception resolution, stale handling, informational warnings, and OWNER-only approval.

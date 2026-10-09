@@ -1,5 +1,14 @@
 # TODO
 
+## Costing / Purchasing follow-up
+
+- [ ] Review and separately authorize local C3A migration `20260929290000_costing_purchase_receipt_acquisition_v1.sql`; it has not been deployed by this implementation task.
+- [ ] Add manager-facing receipt estimate controls and read contracts; keep estimate amounts hidden from GUDANG.
+- [ ] Implement invoice-to-receipt/item matching and append-only provisional-to-final acquisition-cost resolution.
+- [ ] Design direct landed-cost records and deterministic allocation separately from supplier payable.
+- [ ] Integrate every remaining stock writer (including opname and correction/reversal paths) before any WAC activation.
+- [ ] Do not activate WAC until all relevant stock writers are costing-integrated; no bootstrap/activation is part of C3A.
+
 ## Foundation follow-up
 
 - [x] Verify remote `public.profiles` RLS and grants: own-row SELECT only; anon has no privileges; authenticated is SELECT-only. Do not rerun or change the profiles migration as part of the product schema work.

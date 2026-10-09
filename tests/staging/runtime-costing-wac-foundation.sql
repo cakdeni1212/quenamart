@@ -99,17 +99,52 @@ BEGIN
       WHERE outlet_id=v_outlet AND product_id=v_product_valued) THEN
     RAISE EXCEPTION 'VALID_HPP_BOOTSTRAP_MISMATCH';
   END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.inventory_cost_events e
+      WHERE e.outlet_id=v_outlet AND e.product_id=v_product_valued AND e.event_type='OPENING'
+        AND e.physical_quantity_before=0 AND e.physical_quantity_delta=(SELECT effective_quantity FROM public.stock_balance_projection WHERE outlet_id=v_outlet AND product_id=v_product_valued)
+        AND e.physical_quantity_after=e.physical_quantity_delta
+        AND e.valued_quantity_before=0 AND e.valued_quantity_delta=e.valued_quantity_after
+        AND e.valued_quantity_after=e.physical_quantity_after
+        AND e.provisional_quantity_before=0 AND e.provisional_quantity_delta=0 AND e.provisional_quantity_after=0
+        AND e.unvalued_quantity_before=0 AND e.unvalued_quantity_delta=0 AND e.unvalued_quantity_after=0
+        AND e.inventory_value_before=0 AND e.inventory_value_delta=e.inventory_value_after
+        AND e.inventory_value_after=v_projection.inventory_value AND e.wac_after=v_projection.current_wac) THEN
+    RAISE EXCEPTION 'VALUED_OPENING_EVENT_DOES_NOT_RECONCILE';
+  END IF;
   IF NOT EXISTS(SELECT 1 FROM public.inventory_cost_projections cp
     WHERE cp.outlet_id=v_outlet AND cp.product_id=v_product_unvalued
-      AND cp.valuation_status='UNVALUED' AND cp.valued_quantity>0
+      AND cp.valuation_status='UNVALUED'
+      AND cp.physical_quantity=(SELECT effective_quantity FROM public.stock_balance_projection
+        WHERE outlet_id=v_outlet AND product_id=v_product_unvalued)
+      AND cp.valued_quantity=0 AND cp.unvalued_quantity=cp.physical_quantity
       AND cp.inventory_value IS NULL AND cp.current_wac IS NULL) THEN
     RAISE EXCEPTION 'MISSING_HPP_WAS_NOT_LEFT_UNVALUED';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.inventory_cost_events e
+      WHERE e.outlet_id=v_outlet AND e.product_id=v_product_unvalued AND e.event_type='OPENING'
+        AND e.physical_quantity_before=0 AND e.physical_quantity_delta=e.physical_quantity_after
+        AND e.valued_quantity_before=0 AND e.valued_quantity_delta=0 AND e.valued_quantity_after=0
+        AND e.unvalued_quantity_before=0 AND e.unvalued_quantity_delta=e.physical_quantity_after
+        AND e.unvalued_quantity_after=e.physical_quantity_after AND e.provisional_quantity_delta=0
+        AND e.valuation_basis='UNVALUED' AND e.frozen_unit_cost IS NULL
+        AND e.inventory_value_after IS NULL AND e.wac_after IS NULL) THEN
+    RAISE EXCEPTION 'UNVALUED_OPENING_EVENT_DOES_NOT_RECONCILE';
   END IF;
   IF NOT EXISTS(SELECT 1 FROM public.inventory_cost_projections cp
     WHERE cp.outlet_id=v_outlet AND cp.product_id=v_product_zero
       AND cp.valuation_status='VALUED' AND cp.valued_quantity=0
       AND cp.inventory_value=0 AND cp.current_wac IS NULL) THEN
     RAISE EXCEPTION 'ZERO_STOCK_BOOTSTRAP_SEMANTICS_INVALID';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.inventory_cost_events e
+      WHERE e.outlet_id=v_outlet AND e.product_id=v_product_zero AND e.event_type='OPENING'
+        AND e.physical_quantity_before=0 AND e.physical_quantity_delta=0 AND e.physical_quantity_after=0
+        AND e.valued_quantity_before=0 AND e.valued_quantity_delta=0 AND e.valued_quantity_after=0
+        AND e.provisional_quantity_before=0 AND e.provisional_quantity_delta=0 AND e.provisional_quantity_after=0
+        AND e.unvalued_quantity_before=0 AND e.unvalued_quantity_delta=0 AND e.unvalued_quantity_after=0
+        AND e.inventory_value_before=0 AND e.inventory_value_delta=0 AND e.inventory_value_after=0
+        AND e.wac_after IS NULL AND e.valuation_status_after='VALUED') THEN
+    RAISE EXCEPTION 'ZERO_STOCK_OPENING_EVENT_DOES_NOT_RECONCILE';
   END IF;
   IF EXISTS(SELECT 1 FROM public.inventory_cost_projections cp
     JOIN public.inventory_cost_events e ON e.id=cp.last_cost_event_id
