@@ -36,7 +36,6 @@ export default async function ReceiptListPage({ searchParams }: { searchParams: 
   return <main className="page-content purchasing-page">
     <div className="eyebrow">PEMBELIAN · STOK MASUK</div>
     <div className="page-heading purchase-list-heading"><div><h1>Barang Masuk</h1><p>Kelola penerimaan barang dan penambahan stok.</p></div><Link className="purchase-primary purchase-link-button" href="/pembelian/barang-masuk/baru">+ {isManager ? "Pembelian Baru" : "Barang Masuk Baru"}</Link></div>
-    {isManager && <nav className="purchase-manager-shortcuts" aria-label="Menu pembelian lainnya"><Link href="/tempo-supplier">Tempo Supplier →</Link><Link href="/pembelian/supplier">Kelola supplier →</Link></nav>}
     {postedRow && <ReceiptPostSuccess receiptId={postedRow.id} reference={postedRow.receipt_reference} />}
     {cancelledRow && <aside className="purchase-cancelled-banner" role="status"><strong>Draf {cancelledRow.receipt_reference} dibatalkan.</strong><span>{cancelledRow.financial?.documentCleanupPending ? "Pembersihan dokumen nota masih tertunda. Buka detail untuk mencoba lagi." : "Draf tidak memengaruhi stok; riwayatnya tetap tersimpan."}</span><Link href={`/pembelian/barang-masuk/${cancelledRow.id}?mode=view`}>{cancelledRow.financial?.documentCleanupPending ? "Coba pembersihan" : "Lihat riwayat"} →</Link></aside>}
     <form className="purchase-receipt-filters surface-card" method="get">

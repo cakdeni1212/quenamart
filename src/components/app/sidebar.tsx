@@ -31,8 +31,24 @@ export function Sidebar({ role, name }: { role: UserRole; name: string | null })
       <div className="nav-label">MENU UTAMA</div>
       <nav className="nav-list" aria-label="Menu utama">
         {navigation.filter((item) => canAccessSection(role, item.section)).map((item) => {
-          const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-          return <Link key={item.href} href={item.href} className={`nav-item${active ? " nav-active" : ""}`}><span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}{item.label === "Kasir" && <span className="nav-shortcut">F2</span>}</Link>;
+          const purchasing = item.label === "Pembelian";
+          const active = purchasing
+            ? pathname.startsWith("/pembelian") || pathname.startsWith("/tempo-supplier")
+            : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+          const purchasingLinks = [
+            { label: "Barang Masuk", href: "/pembelian/barang-masuk", visible: canAccessSection(role, "pembelian") },
+            { label: "Tempo Supplier", href: "/tempo-supplier", visible: canAccessSection(role, "tempo-supplier") },
+            { label: "Supplier", href: "/pembelian/supplier", visible: canAccessSection(role, "pembelian") },
+          ];
+          return <div key={item.href} className={purchasing ? "nav-purchasing-group" : undefined}>
+            <Link href={item.href} className={`nav-item${active ? " nav-active" : ""}`} aria-current={pathname === item.href ? "page" : undefined}><span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}{item.label === "Kasir" && <span className="nav-shortcut">F2</span>}</Link>
+            {purchasing && <div className="nav-sublist" aria-label="Menu Pembelian">
+              {purchasingLinks.filter((link) => link.visible).map((link) => {
+                const current = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                return <Link key={link.href} href={link.href} className={`nav-item nav-subitem${current ? " nav-active" : ""}`} aria-current={current ? "page" : undefined}>{link.label}</Link>;
+              })}
+            </div>}
+          </div>;
         })}
       </nav>
       <div className="sidebar-bottom">

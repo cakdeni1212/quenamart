@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [landing, receiptPage, newReceipt, workflow, receiptEditor, invoiceEditor, invoiceStart, receiptList, migration, newReceiptStart] = await Promise.all([
+const [landing, receiptPage, newReceipt, workflow, receiptEditor, invoiceEditor, invoiceStart, receiptList, migration, newReceiptStart, sidebar] = await Promise.all([
   read("../app/(workspace)/pembelian/page.tsx"),
   read("../app/(workspace)/pembelian/barang-masuk/[id]/page.tsx"),
   read("../app/(workspace)/pembelian/barang-masuk/baru/page.tsx"),
@@ -14,13 +14,18 @@ const [landing, receiptPage, newReceipt, workflow, receiptEditor, invoiceEditor,
   read("../app/(workspace)/pembelian/barang-masuk/page.tsx"),
   read("../supabase/migrations/20260929230000_purchasing_invoice_payables_v1.sql"),
   read("../src/components/purchasing/new-receipt-start.tsx"),
+  read("../src/components/app/sidebar.tsx"),
 ]);
 const actions = await read("../src/lib/purchasing/actions.ts");
 
-test("Purchasing sidebar route redirects to Barang Masuk, which holds manager finance shortcuts", () => {
+test("Purchasing sidebar opens Barang Masuk and provides role-scoped destinations", () => {
   assert.match(landing, /canAccessSection\(profile\.role, "pembelian"\)/);
   assert.match(landing, /redirect\("\/pembelian\/barang-masuk"\)/);
-  assert.match(receiptList, /isManager &&[\s\S]*?\/tempo-supplier/);
+  assert.match(sidebar, /label: "Pembelian", href: "\/pembelian\/barang-masuk"/);
+  assert.match(sidebar, /label: "Barang Masuk", href: "\/pembelian\/barang-masuk"/);
+  assert.match(sidebar, /label: "Tempo Supplier", href: "\/tempo-supplier", visible: canAccessSection\(role, "tempo-supplier"\)/);
+  assert.match(sidebar, /label: "Supplier", href: "\/pembelian\/supplier"/);
+  assert.doesNotMatch(receiptList, /purchase-manager-shortcuts|Tempo Supplier →|Kelola supplier →/);
   assert.match(receiptList, /Pembelian Baru/);
 });
 
