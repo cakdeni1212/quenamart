@@ -25,6 +25,10 @@ function compareDecimal(left: string | number | null, right: string | number | n
   return af === bf ? 0 : (af > bf ? 1 : -1) * sign;
 }
 
+export function compareRupiahValues(left: string | number | null, right: string | number | null) {
+  return compareDecimal(left, right);
+}
+
 export function formatRupiah(value: string | number | null, fractions = 2) {
   if (value === null) return "—";
   const text = String(value);
@@ -34,6 +38,21 @@ export function formatRupiah(value: string | number | null, fractions = 2) {
   const grouped = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(BigInt(match[2]));
   const decimal = (match[3] ?? "").slice(0, fractions).replace(/0+$/, "");
   return `Rp${sign}${grouped}${decimal ? `,${decimal}` : ""}`;
+}
+
+export function openingHppDisplayValue(row: {
+  preparedEvidence: boolean;
+  disposition: string | null;
+  acceptedHpp: string | number | null;
+  currentHpp: string | number | null;
+  blockers: string[];
+}) {
+  if (row.preparedEvidence) {
+    if (row.disposition === "LEAVE_UNVALUED") return "Belum dinilai";
+    if (row.acceptedHpp !== null) return formatRupiah(row.acceptedHpp);
+    return "Belum ditinjau";
+  }
+  return row.blockers.length === 0 ? formatRupiah(row.currentHpp) : "Belum ditinjau";
 }
 
 export function formatCompactRupiah(value: string | number | null) {

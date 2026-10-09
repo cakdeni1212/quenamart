@@ -9,7 +9,7 @@ import {
   resolveInitialHppAcceptanceException,
 } from "@/app/actions/hpp-acceptance";
 import type { HppAcceptanceRow, HppAcceptanceWorkspaceData, HppAcceptanceView } from "@/lib/costing/hpp-acceptance-read";
-import { blockerLabels, formatCompactRupiah, formatRupiah, visibleHppActionError, warningLabel } from "@/lib/costing/hpp-acceptance-presentation";
+import { blockerLabels, compareRupiahValues, formatCompactRupiah, formatRupiah, openingHppDisplayValue, visibleHppActionError, warningLabel } from "@/lib/costing/hpp-acceptance-presentation";
 import type { UserRole } from "@/lib/auth/roles";
 
 const VIEW_LABEL: Record<HppAcceptanceView, string> = {
@@ -64,13 +64,14 @@ function HppTableRow({ row, view, canResolve, onReview }: {
   const product = <><strong className="hpp-product-name">{row.name}</strong><span className="hpp-sku">{row.sku}</span></>;
   if (view === "CANDIDATES") return <tr>
     <td>{product}</td><td className="hpp-number">{numberLabel(row.stock)}</td>
-    <td className="hpp-number">{formatRupiah(row.currentHpp)}</td><td className="hpp-number">{formatRupiah(row.sellingPrice)}</td>
+    <td className="hpp-number">{formatRupiah(row.currentHpp)}</td><td className="hpp-number">{openingHppDisplayValue(row)}</td><td className="hpp-number">{formatRupiah(row.sellingPrice)}</td>
     <td><span className="hpp-status hpp-status-ready">Siap</span></td>
   </tr>;
   return <tr>
       <td>{product}</td>
       <td className="hpp-number">{numberLabel(row.stock)}</td>
       <td className="hpp-number">{formatRupiah(row.currentHpp)}</td>
+      <td className="hpp-number">{openingHppDisplayValue(row)}</td>
       <td className="hpp-number">{formatRupiah(row.sellingPrice)}</td>
       <td>{view === "EXCEPTIONS" ? <div className="hpp-reasons">{blockers.map((label) => <span key={label}>{label}</span>)}</div>
         : view === "WARNINGS" ? <div className="hpp-reasons hpp-warning-tags">{warnings.map((label) => <span key={label}>{label}</span>)}</div>
@@ -88,7 +89,7 @@ function HppMobileCard({ row, view, canResolve, onReview }: {
   const status = view === "CANDIDATES" ? "Siap" : view === "WARNINGS" ? "Informasi" : row.resolved ? "Selesai" : "Perlu ditinjau";
   return <li className="hpp-mobile-card">
       <div className="hpp-mobile-card-head"><div><strong>{row.name}</strong><span>{row.sku}</span></div><span className={`hpp-status ${view === "WARNINGS" ? "hpp-status-idle" : row.resolved || view === "CANDIDATES" ? "hpp-status-ready" : "hpp-status-prepared"}`}>{status}</span></div>
-      <div className="hpp-mobile-grid"><div><span>Stok saat ini</span><strong>{numberLabel(row.stock)}</strong></div><div><span>{row.preparedEvidence ? "HPP saat persiapan" : "HPP saat ini"}</span><strong>{formatRupiah(row.currentHpp)}</strong></div><div><span>{row.preparedEvidence ? "Harga jual saat persiapan" : "Harga jual"}</span><strong>{formatRupiah(row.sellingPrice)}</strong></div></div>
+      <div className="hpp-mobile-grid"><div><span>Stok saat ini</span><strong>{numberLabel(row.stock)}</strong></div><div><span>HPP Sumber</span><strong>{formatRupiah(row.currentHpp)}</strong></div><div><span>HPP Awal</span><strong>{openingHppDisplayValue(row)}</strong></div><div><span>{row.preparedEvidence ? "Harga jual saat persiapan" : "Harga jual"}</span><strong>{formatRupiah(row.sellingPrice)}</strong></div></div>
       {view === "EXCEPTIONS" && blockers.length > 0 && <div className="hpp-reasons">{blockers.map((label) => <span key={label}>{label}</span>)}</div>}
       {view === "WARNINGS" && warnings.length > 0 && <div className="hpp-reasons hpp-warning-tags">{warnings.map((label) => <span key={label}>{label}</span>)}</div>}
       {view === "EXCEPTIONS" && canResolve && <button className="hpp-secondary-button hpp-mobile-action" type="button" onClick={() => onReview(row)}>{row.resolved ? "Lihat / Ubah keputusan" : "Tinjau"}</button>}
@@ -113,6 +114,8 @@ function ResolutionDialog({ row, batchId, onClose, onSaved }: {
   const currentHppText = row.currentHpp === null ? null : String(row.currentHpp);
   const canAcceptCurrent = currentHppText !== null && /^\d+(?:\.\d+)?$/.test(currentHppText) && /[1-9]/.test(currentHppText);
   const isZeroHpp = currentHppText !== null && /^0+(?:\.0+)?$/.test(currentHppText);
+  const overrideAboveSelling = disposition === "OPENING_HPP_OVERRIDE"
+    && compareRupiahValues(openingHpp, row.sellingPrice) === 1;
   const productId = row.productId;
   const requestKey = `hpp-awal:resolve:${batchId}:${row.productId}:${disposition}:${openingHpp}:${reason.trim()}`;
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -140,16 +143,17 @@ function ResolutionDialog({ row, batchId, onClose, onSaved }: {
   return <dialog ref={dialog} className="hpp-dialog" onClose={onClose} onClick={(event) => { if (event.target === dialog.current) dialog.current?.close(); }}>
     <form onSubmit={submit}>
       <div className="hpp-dialog-head"><div><span className="hpp-eyebrow">TINJAU PRODUK</span><h2>{row.name}</h2><p>{row.sku}</p></div><button type="button" className="hpp-close" aria-label="Tutup" onClick={() => dialog.current?.close()}>×</button></div>
-      <div className="hpp-detail-values"><div><span>Stok saat ini</span><strong>{numberLabel(row.stock)}</strong></div><div><span>{row.preparedEvidence ? "HPP saat persiapan" : "HPP saat ini"}</span><strong>{formatRupiah(row.currentHpp)}</strong></div><div><span>{row.preparedEvidence ? "Harga jual saat persiapan" : "Harga jual"}</span><strong>{formatRupiah(row.sellingPrice)}</strong></div></div>
+      <div className="hpp-detail-values"><div><span>Stok saat ini</span><strong>{numberLabel(row.stock)}</strong></div><div><span>{row.preparedEvidence ? "HPP Sumber / saat persiapan" : "HPP Sumber"}</span><strong>{formatRupiah(row.currentHpp)}</strong></div><div><span>{row.preparedEvidence ? "Harga jual saat persiapan" : "Harga jual"}</span><strong>{formatRupiah(row.sellingPrice)}</strong></div></div>
       <div className="hpp-explanation"><strong>{labels[0] ?? "HPP perlu ditinjau"}</strong>{labels.length > 1 && <p>{labels.slice(1).join(" · ")}</p>}</div>
       {row.warnings.length > 0 && <p className="hpp-dialog-warning">Informasi: {row.warnings.map(warningLabel).join(" · ")}. Peringatan ini tidak menghalangi keputusan.</p>}
       <fieldset className="hpp-options"><legend>Pilih keputusan</legend>
         {canAcceptCurrent && <label><input type="radio" name="disposition" checked={disposition === "ACCEPT_CURRENT_HPP"} onChange={() => setDisposition("ACCEPT_CURRENT_HPP")} /><span><strong>Gunakan HPP saat ini</strong><small>HPP saat ini memang benar dan akan digunakan sebagai nilai awal.</small></span></label>}
         <label><input type="radio" name="disposition" checked={disposition === "OPENING_HPP_OVERRIDE"} onChange={() => setDisposition("OPENING_HPP_OVERRIDE")} /><span><strong>Masukkan HPP awal</strong><small>Nilai ini hanya digunakan sebagai HPP awal sistem baru dan tidak mengubah riwayat HPP iPos.</small></span></label>
-        {disposition === "OPENING_HPP_OVERRIDE" && <label className="hpp-override-field">HPP awal<input inputMode="decimal" autoComplete="off" value={openingHpp} onChange={(event) => setOpeningHpp(event.target.value)} placeholder="Contoh: 3500.50" aria-label="HPP awal" /></label>}
+        {disposition === "OPENING_HPP_OVERRIDE" && <label className="hpp-override-field">HPP awal (Rupiah)<input inputMode="decimal" autoComplete="off" value={openingHpp} onChange={(event) => setOpeningHpp(event.target.value)} placeholder="Contoh: 10000" aria-label="HPP awal dalam Rupiah" /><small>Nilai yang akan disimpan: {formatRupiah(openingHpp)}</small></label>}
         <label><input type="radio" name="disposition" checked={disposition === "LEAVE_UNVALUED"} onChange={() => setDisposition("LEAVE_UNVALUED")} /><span><strong>Biarkan belum dinilai</strong><small>Produk tetap memiliki stok, tetapi nilai modal awal belum ditentukan.</small></span></label>
         {isZeroHpp && <label><input type="radio" name="disposition" checked={disposition === "AUTHORITATIVE_ZERO"} onChange={() => setDisposition("AUTHORITATIVE_ZERO")} /><span><strong>HPP memang Rp0</strong><small>Gunakan Rp0 sebagai nilai awal karena memang benar.</small></span></label>}
       </fieldset>
+      {overrideAboveSelling && <p className="hpp-dialog-warning" role="status">HPP awal yang dimasukkan lebih tinggi daripada harga jual. Pastikan nilai Rupiah sudah benar.</p>}
       <label className="hpp-reason-field">Alasan keputusan<textarea required minLength={1} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Contoh: harga beli dari supplier terakhir memang Rp3.500." /></label>
       {message && <p className="hpp-inline-message" role="alert">{message}</p>}
       <div className="hpp-dialog-actions"><button type="button" className="hpp-secondary-button" onClick={() => dialog.current?.close()}>Batal</button><button type="submit" className="hpp-primary-button" disabled={pending}>{pending ? "Menyimpan…" : "Simpan Keputusan"}</button></div>
@@ -239,11 +243,21 @@ function HppAcceptanceWorkspaceRoute({ data, role }: {
     if (search.trim()) params.set("q", search.trim());
     return `?${params.toString()}`;
   };
+  const valuationTitle = summary?.valuationState === "CANDIDATE_ESTIMATE"
+    ? "Nilai Kandidat HPP"
+    : summary?.valuationState === "APPROVED_VALUE" ? "Modal Awal Disetujui" : "Estimasi Modal Awal";
+  const valuationNote = summary?.valuationState === "CANDIDATE_ESTIMATE"
+    ? "Belum termasuk produk yang perlu ditinjau."
+    : summary?.valuationState === "PREPARED_PROPOSAL"
+      ? `Berdasarkan stok saat persiapan · ${numberLabel(summary.unvaluedProducts)} produk belum dinilai atau ditinjau.`
+      : summary?.valuationState === "APPROVED_VALUE"
+        ? `${numberLabel(summary.unvaluedProducts)} produk tetap belum dinilai.`
+        : null;
   const summaryCards = summary ? [
     ["Produk dengan Stok", numberLabel(summary.positiveStock), "hpp-card-stock"],
     ["Siap Digunakan", numberLabel(summary.candidates), "hpp-card-ready"],
     ["Perlu Ditinjau", numberLabel(batch?.status === "PREPARED" ? batch.unresolved : batch?.status === "APPROVED" || batch?.status === "CONSUMED" ? 0 : summary.exceptions), (batch?.status === "PREPARED" ? batch.unresolved : summary.exceptions) > 0 ? "hpp-card-attention" : "hpp-card-ready"],
-    ["Estimasi Modal Awal", formatCompactRupiah(batch?.approvedValue ?? summary.openingValue), "hpp-card-value"],
+    [valuationTitle, formatCompactRupiah(batch?.approvedValue ?? summary.openingValue), "hpp-card-value"],
   ] as const : [];
   const approvedOpenValue = formatCompactRupiah(batch?.approvedValue ?? summary?.openingValue ?? null);
 
@@ -255,7 +269,7 @@ function HppAcceptanceWorkspaceRoute({ data, role }: {
     {data.error && <div className="hpp-notice hpp-notice-error" role="alert">{data.error}</div>}
     {stale && <div className="hpp-notice hpp-notice-stale"><strong>Data HPP berubah</strong><span>Beberapa data HPP berubah setelah persiapan dibuat. Perbarui persiapan sebelum melanjutkan.</span><button type="button" className="hpp-primary-button" onClick={prepare} disabled={pending}>{pending ? "Memperbarui…" : "Perbarui Persiapan"}</button></div>}
     {approved && <div className="hpp-approved-banner"><span aria-hidden="true">✓</span><div><strong>HPP Awal Sudah Disetujui</strong><p>HPP awal sudah dikunci dan siap digunakan pada tahap aktivasi costing.</p></div></div>}
-    {summary && <section className="hpp-summary-grid" aria-label="Ringkasan persiapan HPP">{summaryCards.map(([label, value, className]) => <article key={label} className={`hpp-summary-card ${className}`}><span>{label}</span><strong>{value}</strong></article>)}</section>}
+    {summary && <section className="hpp-summary-grid" aria-label="Ringkasan persiapan HPP">{summaryCards.map(([label, value, className]) => <article key={label} className={`hpp-summary-card ${className}`}><span>{label}</span><strong>{value}</strong>{className === "hpp-card-value" && valuationNote && <small>{valuationNote}</small>}</article>)}</section>}
 
     {!batch && summary && <section className="surface-card hpp-prepare-panel"><div><span className="hpp-eyebrow">LANGKAH PERSIAPAN</span><h2>Siapkan HPP awal</h2><p>Sistem akan menyimpan kondisi HPP saat ini agar produk yang perlu ditinjau dapat diselesaikan.</p><small>Persiapan ini belum mengubah stok.</small></div><button type="button" className="hpp-primary-button" onClick={prepare} disabled={pending || !data.outletId}>{pending ? "Menyiapkan…" : "Siapkan HPP Awal"}</button></section>}
 
@@ -269,7 +283,7 @@ function HppAcceptanceWorkspaceRoute({ data, role }: {
         return <Link key={view} href={navigateView(view)} className={data.view === view ? "hpp-tab hpp-tab-active" : "hpp-tab"} aria-current={data.view === view ? "page" : undefined}>{VIEW_LABEL[view]}<span>{numberLabel(count)}</span></Link>;
       })}</nav>
       {data.rows.length === 0 ? <div className="hpp-empty"><strong>{data.search ? "Produk tidak ditemukan" : data.view === "EXCEPTIONS" ? "Tidak ada produk yang perlu ditinjau" : data.view === "WARNINGS" ? "Tidak ada peringatan" : "Belum ada produk siap ditampilkan"}</strong><span>{data.search ? "Coba kata pencarian lain." : data.view === "EXCEPTIONS" ? "Semua produk stok aktif sudah memiliki keputusan." : "Data akan tampil saat tersedia."}</span></div> : <>
-        <div className="hpp-table-wrap"><table className="hpp-table"><thead><tr><th>Produk</th><th>Stok Saat Ini</th><th>{batch ? "HPP saat persiapan" : "HPP Saat Ini"}</th><th>{batch ? "Harga jual saat persiapan" : "Harga Jual"}</th>{data.view === "CANDIDATES" ? <th>Status</th> : <><th>{data.view === "EXCEPTIONS" ? "Masalah" : "Peringatan"}</th><th>Status</th><th>Aksi</th></>}</tr></thead><tbody>{data.rows.map((row) => <HppTableRow key={row.productId} row={row} view={data.view} canResolve={canResolve && data.view === "EXCEPTIONS"} onReview={setSelected} />)}</tbody></table></div>
+        <div className="hpp-table-wrap"><table className="hpp-table"><thead><tr><th>Produk</th><th>Stok Saat Ini</th><th>HPP Sumber</th><th>HPP Awal</th><th>{batch ? "Harga jual saat persiapan" : "Harga Jual"}</th>{data.view === "CANDIDATES" ? <th>Status</th> : <><th>{data.view === "EXCEPTIONS" ? "Masalah" : "Peringatan"}</th><th>Status</th><th>Aksi</th></>}</tr></thead><tbody>{data.rows.map((row) => <HppTableRow key={row.productId} row={row} view={data.view} canResolve={canResolve && data.view === "EXCEPTIONS"} onReview={setSelected} />)}</tbody></table></div>
         <ul className="hpp-mobile-list">{data.rows.map((row) => <HppMobileCard key={`${row.productId}-mobile`} row={row} view={data.view} canResolve={canResolve && data.view === "EXCEPTIONS"} onReview={setSelected} />)}</ul>
         <div className="hpp-pagination"><span>{numberLabel(data.total)} produk · Halaman {data.page} dari {pages}</span><div>{data.page > 1 && <Link href={pageUrl(data.page - 1)}>← Sebelumnya</Link>}{data.page < pages && <Link href={pageUrl(data.page + 1)}>Berikutnya →</Link>}</div></div>
       </>}

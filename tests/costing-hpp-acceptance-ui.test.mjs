@@ -11,6 +11,7 @@ const workspace = read('src/components/costing/hpp-acceptance-workspace.tsx');
 const presentation = read('src/lib/costing/hpp-acceptance-presentation.ts');
 const roles = read('src/lib/auth/roles.ts');
 const sidebar = read('src/components/app/sidebar.tsx');
+const globalStyles = read('app/globals.css');
 
 test('HPP initial preparation route and navigation are restricted to OWNER and ADMIN', () => {
   assert.match(roles, /"hpp-awal": \["OWNER", "ADMIN"\]/);
@@ -129,4 +130,19 @@ test('phone layout has separate cards, usable action controls, and no table over
   assert.match(workspace, /hpp-mobile-action/);
   assert.match(read('app/globals.css'), /\.hpp-table-wrap\{display:none\}/);
   assert.match(read('app/globals.css'), /\.hpp-mobile-list\{display:grid/);
+});
+
+test('product review dialog is explicitly viewport-centered, bounded, scrollable, and remains a native modal', () => {
+  const dialogStyles = globalStyles.match(/\.hpp-dialog\{([^}]+)\}/)?.[1] ?? '';
+  assert.match(dialogStyles, /position:fixed/);
+  assert.match(dialogStyles, /inset:0/);
+  assert.match(dialogStyles, /margin:auto/);
+  assert.match(dialogStyles, /width:min\(570px,calc\(100% - 24px\)\)/);
+  assert.match(dialogStyles, /max-width:calc\(100vw - 24px\)/);
+  assert.match(dialogStyles, /max-height:min\(90dvh,820px\)/);
+  assert.match(dialogStyles, /overflow-y:auto/);
+  assert.match(dialogStyles, /z-index:1001/);
+  assert.match(globalStyles, /\.hpp-dialog::backdrop\{background:/);
+  assert.match(workspace, /dialog\.current\.showModal\(\)/);
+  assert.match(workspace, /onClick=\{\(event\) => \{ if \(event\.target === dialog\.current\) dialog\.current\?\.close\(\); \}\}/);
 });

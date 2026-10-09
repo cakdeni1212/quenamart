@@ -2,6 +2,7 @@ import "server-only";
 import { performance } from "node:perf_hooks";
 
 import { createClient } from "@/lib/supabase/server";
+import { readAllPreparedValuationItems, summarizePreparedOpeningValue } from "@/lib/costing/hpp-acceptance-valuation";
 
 export type HppAcceptanceView = "EXCEPTIONS" | "CANDIDATES" | "WARNINGS";
 export type HppAcceptanceRow = {
@@ -39,6 +40,8 @@ export type HppAcceptanceWorkspaceData = {
     exceptions: number;
     warningProducts: number;
     openingValue: string | number;
+    valuationState: "CANDIDATE_ESTIMATE" | "PREPARED_PROPOSAL" | "APPROVED_VALUE";
+    unvaluedProducts: number | null;
   } | null;
   rows: HppAcceptanceRow[];
   total: number;
@@ -51,6 +54,7 @@ export type HppAcceptanceWorkspaceData = {
 
 type Json = Record<string, unknown>;
 const PAGE_SIZE = 20;
+const SUMMARY_READ_PAGE_SIZE = 1000;
 const VIEWS: HppAcceptanceView[] = ["EXCEPTIONS", "CANDIDATES", "WARNINGS"];
 
 function isObject(value: unknown): value is Json {
@@ -157,12 +161,46 @@ export async function readHppAcceptanceWorkspace(
       approvedValue: scalar(batchRow.estimated_opening_value),
       unresolved: integer(unresolved),
     };
+    const summaryItemCount = batch.candidates + batch.exceptions;
+    const summaryRead = await readAllPreparedValuationItems(
+      summaryItemCount,
+      SUMMARY_READ_PAGE_SIZE,
+      async (start, end) => await supabase.from("inventory_cost_hpp_acceptance_items")
+        .select("disposition,accepted_opening_hpp,quantity_at_prepare")
+        .eq("batch_id", batchId).order("product_id")
+        .range(start, end),
+    );
+    if (summaryRead.error) {
+      console.error("[hpp-awal] prepared valuation summary read failed", { code: summaryRead.error.code });
+      return { ...errorData(view, page, search, "Estimasi modal awal belum dapat dimuat. Coba muat ulang."), outletId };
+    }
+    if (!summaryRead.complete || !summaryRead.items) {
+      console.error("[hpp-awal] prepared valuation summary incomplete", { expected: summaryItemCount });
+      return { ...errorData(view, page, search, "Estimasi modal awal belum lengkap. Coba muat ulang."), outletId };
+    }
+    let preparedValuation: ReturnType<typeof summarizePreparedOpeningValue>;
+    try {
+      preparedValuation = summarizePreparedOpeningValue(summaryRead.items.map((item) => ({
+        disposition: item.disposition,
+        acceptedOpeningHpp: scalar(item.accepted_opening_hpp),
+        quantity: scalar(item.quantity_at_prepare),
+      })));
+    } catch {
+      console.error("[hpp-awal] prepared valuation evidence invalid");
+      return { ...errorData(view, page, search, "Estimasi modal awal belum dapat dipastikan. Coba muat ulang."), outletId };
+    }
     summary = {
       positiveStock: batch.candidates + batch.exceptions,
       candidates: batch.candidates,
       exceptions: batch.exceptions,
       warningProducts: batch.warningProducts,
-      openingValue: batch.candidateValue ?? "0",
+      openingValue: batch.status === "APPROVED" || batch.status === "CONSUMED"
+        ? batch.approvedValue ?? preparedValuation.openingValue
+        : preparedValuation.openingValue,
+      valuationState: batch.status === "APPROVED" || batch.status === "CONSUMED"
+        ? "APPROVED_VALUE"
+        : "PREPARED_PROPOSAL",
+      unvaluedProducts: preparedValuation.unvaluedProducts,
     };
 
     let query = supabase.from("inventory_cost_hpp_acceptance_items")
@@ -252,6 +290,8 @@ export async function readHppAcceptanceWorkspace(
       exceptions: integer(rawSummary.exceptions),
       warningProducts: integer(rawSummary.warningProducts),
       openingValue: scalar(rawSummary.estimatedAutoCandidateValue) ?? "0",
+      valuationState: "CANDIDATE_ESTIMATE",
+      unvaluedProducts: null,
     };
     total = integer(data.total);
     rows = Array.isArray(data.rows) ? data.rows.map(parsePreviewRow).filter((row): row is HppAcceptanceRow => row !== null) : [];
