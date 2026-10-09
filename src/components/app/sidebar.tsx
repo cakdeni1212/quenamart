@@ -13,6 +13,7 @@ const navigation: { label: string; href: string; section: AppSection; icon: stri
   { label: "Produk", href: "/produk", section: "produk", icon: "◫" },
   { label: "Stok", href: "/stok", section: "stok", icon: "▤" },
   { label: "Audit Produk", href: "/audit-produk", section: "audit-produk", icon: "⌕" },
+  { label: "Persiapan HPP Awal", href: "/hpp-awal", section: "hpp-awal", icon: "◉" },
   { label: "Pembelian", href: "/pembelian/barang-masuk", section: "pembelian", icon: "＋" },
   { label: "Member", href: "/member", section: "member", icon: "♧" },
   { label: "Laporan", href: "/laporan", section: "laporan", icon: "▥" },

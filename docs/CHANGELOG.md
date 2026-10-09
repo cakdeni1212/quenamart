@@ -1,10 +1,15 @@
 # Changelog
 
-## 2026-10-08 — Costing Engine v1 Initial HPP acceptance Checkpoint A (local implementation)
+## 2026-10-08 — Costing Engine v1 Initial HPP acceptance Checkpoint B (local UI)
 
-- Added candidate migration `20260929260000_costing_initial_hpp_acceptance_v1.sql` with bounded manager preview, replay-safe preparation, exception dispositions, stale-fact checks, append-only audit, and OWNER-only approval evidence.
+- Added protected `/hpp-awal` workspace for OWNER/ADMIN with live bounded preview, server-side search/pagination, explicit preparation, exception resolution, stale handling, informational warnings, and OWNER-only approval.
+- The UI calls only Checkpoint A contracts. It does not bootstrap, activate WAC, or modify stock/HPP data.
+
+## 2026-10-08 — Costing Engine v1 Initial HPP acceptance Checkpoint A (deployed capability)
+
+- Added migration `20260929260000_costing_initial_hpp_acceptance_v1.sql` with bounded manager preview, replay-safe preparation, exception dispositions, stale-fact checks, append-only audit, and OWNER-only approval evidence.
 - Automatic eligibility uses source/HPP/history/review/override/finding/selling-price structure. Margin and absolute outlier signals remain warnings. Opening overrides and explicit zero acceptance do not rewrite legacy HPP or iPos history.
-- Local rollback-only staging coverage passed. The candidate is not deployed; no production acceptance, bootstrap, costing authority, or WAC activation was performed.
+- Local rollback-only staging coverage passed. The capability migration was deployed; no production acceptance was prepared or approved, no bootstrap was run, and WAC remains inactive.
 
 ## 2026-10-08 — Costing Engine v1 Checkpoint 1 foundation (deployed capability)
 

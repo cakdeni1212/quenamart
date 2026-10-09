@@ -16,6 +16,7 @@ export type AppSection =
   | "produk"
   | "stok"
   | "audit-produk"
+  | "hpp-awal"
   | "pembelian"
   | "tempo-supplier"
   | "member"
@@ -30,6 +31,7 @@ const sectionAccess: Record<AppSection, readonly UserRole[]> = {
   produk: ["OWNER", "ADMIN", "GUDANG"],
   stok: ["OWNER", "ADMIN", "GUDANG"],
   "audit-produk": ["OWNER", "ADMIN", "GUDANG"],
+  "hpp-awal": ["OWNER", "ADMIN"],
   pembelian: ["OWNER", "ADMIN", "GUDANG"],
   "tempo-supplier": ["OWNER", "ADMIN"],
   member: ["OWNER", "ADMIN", "KASIR"],

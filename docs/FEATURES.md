@@ -7,6 +7,7 @@
 - Server-verified active profile loading and role-aware landing.
 - Protected workspace layout and server section checks.
 - Responsive Quena Mart shell, sidebar, empty-state dashboard, and future metric/chart placeholders.
+- Protected `/hpp-awal` Persiapan HPP Awal workspace for OWNER/ADMIN, using Checkpoint A bounded preview, explicit preparation, reasoned exception resolution, and OWNER-only approval. Warnings remain informational; approval does not bootstrap or change stock.
 
 ## Phase 3C.1B Stock workspace
 

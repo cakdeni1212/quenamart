@@ -227,3 +227,14 @@ GUDANG/KASIR reads and direct writes, ledger immutability, event/version links,
 precision, and negative valuation rejection. This foundation does not activate
 WAC or alter receipt stock posting. No production target, data, or credentials
 are used.
+
+For the HPP acceptance preview performance replacement, apply only
+`20260929270000_costing_hpp_acceptance_preview_performance_v1.sql` to the
+guarded local target with
+`bash tests/staging/apply-costing-hpp-preview-performance.sh`. Then run
+`bash tests/staging/run-costing-hpp-preview-performance.sh`. The runtime script
+uses a read-only transaction, compares summary/filter/search/page results with
+the unchanged evaluator, and prints `EXPLAIN ANALYZE` timings for exceptions,
+candidates, warnings, search, and page 2. It does not create acceptance rows or
+change business data. Its timings are representative only of the local staging
+dataset available at the time; no production endpoint is used.

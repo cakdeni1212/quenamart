@@ -18,6 +18,7 @@ SELECT id outlet_id FROM public.outlets WHERE code='QUENA-MART-1' AND is_active 
 SELECT id product_candidate FROM public.products p JOIN public.product_costs c ON c.product_id=p.id
   JOIN public.stock_balance_projection s ON s.product_id=p.id AND s.outlet_id=c.outlet_id
   WHERE c.outlet_id=:'outlet_id'::uuid AND s.effective_quantity>0 AND c.hpp>0
+    AND p.sku<>'STG-FULL-A'
     AND NOT EXISTS(SELECT 1 FROM public.product_field_overrides o WHERE o.product_id=p.id
       AND o.outlet_id=c.outlet_id AND o.field_key='hpp' AND o.is_active)
   ORDER BY p.sku LIMIT 1 \gset

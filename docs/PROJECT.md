@@ -20,7 +20,7 @@ Quena Mart is a Next.js 16.3.6 App Router application using TypeScript, Tailwind
 - [Architecture](ARCHITECTURE.md): routing, sessions, role checks, and security boundaries.
 - [Database](DATABASE.md): current Supabase schema and future data guidance.
 - [iPos import](IPOS_IMPORT.md), [product audit](AUDIT_RULES.md), [POS](POS.md), [loyalty](LOYALTY.md), [supplier terms](TEMPO_SUPPLIER.md), [reporting](REPORTING.md), and [Costing Engine](COSTING.md): data contracts and future integration guidance.
-- Costing initial HPP acceptance Checkpoint A is implemented locally as a candidate migration; it is not deployed. Production bootstrap and WAC activation remain unauthorized and inactive.
+- Costing foundation migration 250000 and initial HPP acceptance migration 260000 are deployed to Quena Mart production as capability only. The `/hpp-awal` OWNER/ADMIN preparation and approval UI uses the deployed Checkpoint A contracts. Production acceptance remains unprepared/unapproved; bootstrap has not run and WAC is inactive.
 - [Features](FEATURES.md): implemented and planned scope.
 - [Changelog](CHANGELOG.md): shipped changes.
 - [TODO](TODO.md): next work and open decisions.

@@ -5,15 +5,20 @@ source "$SCRIPT_DIR/lib.sh"
 trap cleanup_local_pgpass EXIT
 guard_local_target
 assert_local_staging_marker
-expected_versions=$'20260928\n20260928115000\n20260928143000\n20260929100000\n20260929130000\n20260929150000\n20260929160000\n20260929170000\n20260929171000\n20260929180000\n20260929190000\n20260929200000\n20260929210000\n20260929220000\n20260929230000\n20260929240000\n20260929250000\n20260929260000'
+expected_versions=$'20260928\n20260928115000\n20260928143000\n20260929100000\n20260929130000\n20260929150000\n20260929160000\n20260929170000\n20260929171000\n20260929180000\n20260929190000\n20260929200000\n20260929210000\n20260929220000\n20260929230000\n20260929240000\n20260929250000\n20260929260000\n20260929270000'
 actual_versions="$(psql_local -Atqc 'SELECT version FROM quena_staging.applied_migrations ORDER BY ordinal')"
 if [[ "$actual_versions" != "$expected_versions" ]]; then
-  printf 'REFUSED: guarded staging migration ledger is not exactly through 20260929260000\n' >&2
+  printf 'REFUSED: guarded staging migration ledger is not exactly through 20260929270000\n' >&2
   exit 185
 fi
 foundation_sha="$(shasum -a 256 "$STAGING_ROOT/supabase/migrations/20260929250000_costing_wac_foundation_v1.sql" | awk '{print $1}')"
 if [[ "$foundation_sha" != 'ad0531ef545acf92d6d6dc57098e35d4b4f013036b858c8c59c01024cbb26f06' ]]; then
   printf 'REFUSED: immutable Checkpoint 1 migration SHA mismatch\n' >&2
+  exit 186
+fi
+preview_sha="$(shasum -a 256 "$STAGING_ROOT/supabase/migrations/20260929270000_costing_hpp_acceptance_preview_performance_v1.sql" | awk '{print $1}')"
+if [[ "$preview_sha" != '9e01e126b22180be368357857fd5471711c38cff64e2dcbfb95493568a9ac0f6' ]]; then
+  printf 'REFUSED: preview performance migration SHA mismatch\n' >&2
   exit 186
 fi
 objects="$(psql_local -Atqc "SELECT to_regprocedure('public.inventory_cost_initial_hpp_acceptance_preview(uuid,text,text,integer,integer)') IS NOT NULL
