@@ -92,3 +92,9 @@
 - Implement controlled OWNER/ADMIN valuation resolution for remaining unvalued source-layer quantity; preserve consumed quantity provenance and append a separate event.
 - Integrate sales/COGS, supplier returns, manual corrections/reversals, and every other stock-changing writer before any `WAC_ACTIVE` activation.
 - Define later invoice/landed-cost allocation between remaining and already-consumed provisional receipt quantities using source-layer quantities without FIFO/LIFO value accounting.
+# Costing Engine V1 — remaining activation work after C3C
+
+- Validate and review C3C before any deployment; do not activate WAC as part of capability installation.
+- Complete controlled valuation resolution for remaining unvalued source layers.
+- Integrate supplier returns, POS sales/COGS, and every remaining stock-changing writer before WAC activation.
+- Define and validate cutover/bootstrap activation after all stock writers are costing-atomic.

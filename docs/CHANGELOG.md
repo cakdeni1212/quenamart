@@ -201,3 +201,8 @@
 - Added protected source quantity layers, mutable balance projections, and immutable layer allocation evidence.
 - Added atomic WAC costing for stock-opname variance and movement reversal, including proportional provenance allocation and exact reversal dependency checks.
 - Extended future bootstrap and C3A purchase-receipt costing to create source layers. WAC activation and bootstrap execution remain separate, unauthorized actions.
+# 2026-10-10 — C3C manual stock correction
+
+- Added a manager-only, revision-guarded manual stock correction workflow with auditable drafts and immutable posted movements.
+- Positive corrections remain UNVALUED; negative corrections reuse C3B unvalued-first, proportional source-layer depletion and aggregate-WAC financial depletion.
+- Added capability for atomic stock/cost/source-layer posting under WAC_ACTIVE, a pre-mutation BOOTSTRAP_READY gate, and standard C3B movement reversal compatibility. WAC remains inactive and bootstrap is not run by this migration.
