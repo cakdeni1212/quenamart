@@ -196,3 +196,8 @@
 - OWNER/ADMIN can correct barcode, rack, HPP, and selling price. GUDANG can correct barcode and rack only; the existing server read model continues to omit financial source data for GUDANG. KASIR remains denied by the audit route/actions and database RPCs.
 - The client keeps only the opaque database-issued correction intent UUID in local storage. Values and reasons are cleared from form state after intent issuance and stay in the private database intent; retries call the UUID-only apply action. Confirmed success/conflict consumes the stored UUID, and stale source errors require refreshing the audit.
 - Added Indonesian currency parsing/formatting for HPP and selling price, a confirmation summary, barcode conflict messaging, and UI/contract tests. No database migration was created. Authenticated correction runtime and concurrency verification remains pending in isolated staging; the UI is not production mutation/runtime verified.
+# 2026-10-10 — C3B local costing implementation
+
+- Added protected source quantity layers, mutable balance projections, and immutable layer allocation evidence.
+- Added atomic WAC costing for stock-opname variance and movement reversal, including proportional provenance allocation and exact reversal dependency checks.
+- Extended future bootstrap and C3A purchase-receipt costing to create source layers. WAC activation and bootstrap execution remain separate, unauthorized actions.

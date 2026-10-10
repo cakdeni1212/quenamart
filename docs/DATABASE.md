@@ -1,5 +1,11 @@
 # Database
 
+## C3B source-layer costing schema
+
+Migration `20260929300000_costing_stock_opname_source_layers_v1.sql` adds three protected relations: `inventory_cost_source_layers` stores immutable source identity/evidence; `inventory_cost_source_layer_balances` stores current remaining quantity buckets; `inventory_cost_layer_allocations` stores append-only quantity effects for each cost event. Composite foreign keys bind event, product, outlet, receipt item, opname item, and stock movement identities. Balance-to-ledger, event-to-allocation, projection, authority, and stock-quantity invariants are deferred to transaction end.
+
+Source-layer allocation is quantity provenance only and must never be used as FIFO/LIFO financial value. WAC and inventory value remain in `inventory_cost_projections` and `inventory_cost_events`. The C3B stock-operation wrapper installs a shared outlet cutover lock, a `BOOTSTRAP_READY` gate, and atomic costing for opname posting and movement reversal under `WAC_ACTIVE`. The migration only installs functions/schema; it does not create authority rows, execute bootstrap, or activate WAC.
+
 ## Existing Supabase schema
 
 The Supabase project already has RLS enabled and contains:

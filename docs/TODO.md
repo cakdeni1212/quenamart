@@ -85,3 +85,10 @@
 - Design future due-date reminder policy separately; external WhatsApp integration remains out of scope.
 - Implement reports and charts after accounting definitions and role permissions are agreed.
 - Replace dashboard placeholders with authorized data only after source modules and definitions exist.
+
+## C3B follow-up and WAC activation blockers
+
+- Run the complete guarded C3B staging matrix, including stock-opname/reversal atomicity, same/different request replay, receipt concurrency, and bootstrap cutover concurrency.
+- Implement controlled OWNER/ADMIN valuation resolution for remaining unvalued source-layer quantity; preserve consumed quantity provenance and append a separate event.
+- Integrate sales/COGS, supplier returns, manual corrections/reversals, and every other stock-changing writer before any `WAC_ACTIVE` activation.
+- Define later invoice/landed-cost allocation between remaining and already-consumed provisional receipt quantities using source-layer quantities without FIFO/LIFO value accounting.

@@ -238,3 +238,13 @@ the unchanged evaluator, and prints `EXPLAIN ANALYZE` timings for exceptions,
 candidates, warnings, search, and page 2. It does not create acceptance rows or
 change business data. Its timings are representative only of the local staging
 dataset available at the time; no production endpoint is used.
+# C3B stock-opname source-layer staging
+
+On the guarded disposable PostgreSQL 15 staging database, apply C3B only after the exact 280000/290000 frontier:
+
+```sh
+bash tests/staging/apply-costing-stock-opname-source-layers.sh
+bash tests/staging/run-costing-stock-opname-source-layers.sh
+```
+
+The runtime script creates synthetic bootstrap and opname/reversal evidence inside one transaction, enters `WAC_ACTIVE` only in that local transaction, forces deferred invariants, and rolls the entire scenario back. It checks opening layers, the `BOOTSTRAP_READY` retry gate, unvalued positive/negative opname, same-request replay, exact movement reversal, source-layer restoration, and source event linkage. Never point these scripts at production or use production IDs.
