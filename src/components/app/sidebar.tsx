@@ -37,6 +37,7 @@ export function Sidebar({ role, name }: { role: UserRole; name: string | null })
             : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
           const purchasingLinks = [
             { label: "Barang Masuk", href: "/pembelian/barang-masuk", visible: canAccessSection(role, "pembelian") },
+            { label: "Retur Supplier", href: "/pembelian/retur-supplier", visible: canAccessSection(role, "pembelian") },
             { label: "Tempo Supplier", href: "/tempo-supplier", visible: canAccessSection(role, "tempo-supplier") },
             { label: "Supplier", href: "/pembelian/supplier", visible: canAccessSection(role, "pembelian") },
           ];

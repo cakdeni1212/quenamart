@@ -53,7 +53,7 @@
 - [ ] Implement Checkpoint 2 receipt valuation integrated atomically with controlled receipt posting; keep outlet status `BOOTSTRAP_READY` until all stock writers are integrated.
 - [ ] Implement invoice adjustment and landed-cost allocation as append-only cost events; do not change supplier payable or stock quantity.
 - [ ] Design and implement POS sale/COGS, returns, and late-cost consumed-versus-on-hand behavior before activating WAC or launching native POS. Do not update `product_costs.hpp` from purchasing operations.
-- [ ] Implement supplier returns with negative stock movement and separate supplier-credit/payment consequences.
+- [x] Implement supplier-return stock workflow; supplier-credit/payment consequences remain separate future work.
 
 - [x] Complete the read-only production compatibility gate for `20260929180000_stock_foundation_v1.sql`: 25/25 components passed, including 5,103/5,103 eligible bootstrap rows and zero stock-object collisions.
 - [x] Rerun isolated PostgreSQL 15 prepare/apply/single-session runtime verification after the local 180000 change requiring `expected_revision` for `RECORD_COUNT`. User-confirmed staging result: all runtime assertions passed and rolled back; production remains untouched.
@@ -90,11 +90,11 @@
 
 - Run the complete guarded C3B staging matrix, including stock-opname/reversal atomicity, same/different request replay, receipt concurrency, and bootstrap cutover concurrency.
 - Implement controlled OWNER/ADMIN valuation resolution for remaining unvalued source-layer quantity; preserve consumed quantity provenance and append a separate event.
-- Integrate sales/COGS, supplier returns, manual corrections/reversals, and every other stock-changing writer before any `WAC_ACTIVE` activation.
+- Integrate sales/COGS, manual corrections/reversals, and every other stock-changing writer before any `WAC_ACTIVE` activation.
 - Define later invoice/landed-cost allocation between remaining and already-consumed provisional receipt quantities using source-layer quantities without FIFO/LIFO value accounting.
 # Costing Engine V1 — remaining activation work after C3C
 
 - Validate and review C3C before any deployment; do not activate WAC as part of capability installation.
 - Complete controlled valuation resolution for remaining unvalued source layers.
-- Integrate supplier returns, POS sales/COGS, and every remaining stock-changing writer before WAC activation.
+- Integrate POS sales/COGS and every remaining stock-changing writer before WAC activation.
 - Define and validate cutover/bootstrap activation after all stock writers are costing-atomic.

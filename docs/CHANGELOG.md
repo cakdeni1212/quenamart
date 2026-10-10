@@ -206,3 +206,9 @@
 - Added a manager-only, revision-guarded manual stock correction workflow with auditable drafts and immutable posted movements.
 - Positive corrections remain UNVALUED; negative corrections reuse C3B unvalued-first, proportional source-layer depletion and aggregate-WAC financial depletion.
 - Added capability for atomic stock/cost/source-layer posting under WAC_ACTIVE, a pre-mutation BOOTSTRAP_READY gate, and standard C3B movement reversal compatibility. WAC remains inactive and bootstrap is not run by this migration.
+
+# 2026-10-10 — C3D supplier returns
+
+- Added supplier-linked physical return drafts with optional native receipt-item attribution and support for unlinked legacy inventory.
+- Posting validates both accepted-plus-bonus attribution and current stock. WAC_ACTIVE uses aggregate WAC and C3B unvalued-first proportional source-layer depletion atomically; source receipt prices do not determine return value.
+- OWNER/ADMIN post, GUDANG may manage drafts, and KASIR is denied. Supplier invoices, payables, and payments remain unchanged. This migration is a local capability candidate only.
