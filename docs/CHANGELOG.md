@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-10 — Native POS P1B persisted cart foundation
+
+- Added migration `20260929330000_pos_cart_foundation_v1.sql` for persistent outlet-bound `ACTIVE`/`PARKED`/`CANCELLED` carts, item price evidence, append-only cart events, actor/payload-bound request replay, and revision guards.
+- Added cashier-authorized exact barcode resolution and bounded POS product search, plus server actions/read model. OWNER/ADMIN can manage authorized outlet carts; KASIR can manage its own; GUDANG is denied. Price changes are visible and require an explicit server-verified acknowledgement.
+- P1B has no sale completion, payment, revenue, stock movement, or costing writer. The disposable-clone PostgreSQL 15 rollback matrix validates cart behavior and unchanged operational fingerprints; production was not accessed.
+
 ## 2026-10-09 — Costing C3A local implementation
 
 - Added forward-only local candidate migration `20260929290000_costing_purchase_receipt_acquisition_v1.sql` for protected receipt-item estimate revisions, explicit partial/provisional/unvalued projection fields, source-event uniqueness, and atomic receipt-post costing gated on `WAC_ACTIVE`.

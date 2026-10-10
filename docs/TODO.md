@@ -52,7 +52,7 @@
 - [ ] DO NOT RUN PRODUCTION COSTING BOOTSTRAP YET. Acceptance preparation/approval and bootstrap are separate actions. No production acceptance batch is currently prepared or approved, and no WAC authority is active. Bootstrap requires separate approval after HPP acceptance and costing integration review; never weaken provenance rules or mark unreviewed HPP as verified.
 - [ ] Implement Checkpoint 2 receipt valuation integrated atomically with controlled receipt posting; keep outlet status `BOOTSTRAP_READY` until all stock writers are integrated.
 - [ ] Implement invoice adjustment and landed-cost allocation as append-only cost events; do not change supplier payable or stock quantity.
-- [ ] Design and implement POS sale/COGS, returns, and late-cost consumed-versus-on-hand behavior before activating WAC or launching native POS. Do not update `product_costs.hpp` from purchasing operations.
+- [x] Complete P1A native POS architecture and lock P1B cashier-cart contracts in `docs/POS_ARCHITECTURE.md`. Sale/COGS, refund, and late-cost writers remain future work and block POS go-live/WAC activation.
 - [x] Implement supplier-return stock workflow; supplier-credit/payment consequences remain separate future work.
 
 - [x] Complete the read-only production compatibility gate for `20260929180000_stock_foundation_v1.sql`: 25/25 components passed, including 5,103/5,103 eligible bootstrap rows and zero stock-object collisions.
@@ -80,7 +80,9 @@
 - [ ] Future module: generic stock movement history / Kartu Stok combining opname, sales, purchases, returns, transfers, and other movements.
 
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
-- Implement POS carts, parked transactions, payments, member lookup, receipts, and stock consistency.
+- [x] P1B persisted cart schema/RPCs, KASIR barcode/search contracts, revision/idempotency guards, and price-change evidence; local rollback staging only, no checkout writer.
+- Implement P1C cashier POS UI with barcode scan, bounded search, multiple carts, park/resume, and explicit price-change acknowledgement.
+- Implement P1D atomic checkout/payment/stock OUT/SALE_COGS, gated to `WAC_ACTIVE`; then P1E receipt, transaction history, reporting, and go-live hardening.
 - Implement loyalty rules, member records, reward catalog, redemption, and point ledger.
 - Design future due-date reminder policy separately; external WhatsApp integration remains out of scope.
 - Implement reports and charts after accounting definitions and role permissions are agreed.
