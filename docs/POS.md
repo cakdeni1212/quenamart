@@ -11,3 +11,11 @@ Cart lines store server-resolved outlet selling price and price-history evidence
 P1B adds no completed sale state, checkout, payment, revenue, stock movement, costing event, or source-layer mutation. It does not reserve stock. Future completion must revalidate current price and stock and remain blocked until `WAC_ACTIVE`; then sale, payment, stock, and COGS must be atomic. POS v1 has no cashier manual discount; split-payment storage is a future checkout concern, while the first completion UI will use one method. Unvalued sold quantity must remain explicitly unresolved, never zero COGS.
 
 Validation uses `bash tests/staging/run-pos-cart-foundation-matrix.sh`, which clones the guarded local migration-300000 staging database, applies 310000–330000 to the disposable clone, runs the P1B transaction/rollback matrix, compares operational fingerprints, and drops only that clone. It never uses production.
+
+## P1C cashier workspace
+
+The `/kasir` route provides the first cashier UI over the persisted cart foundation installed in P1B. OWNER, ADMIN, and KASIR can access the route; GUDANG is redirected by the workspace role check. The cashier screen supports exact barcode resolution on Enter, debounced name/SKU/barcode search, quantity changes, explicit acknowledgement of changed prices, parking, resuming, and cancellation.
+
+Cart state and commercial totals come from `pos_cart_workspace_read`. Mutations use the P1B server actions with a fresh request UUID and the read model revision. A stale revision triggers a reload. Empty ACTIVE cart creation is avoided when an ACTIVE cart already appears in the bounded P1B read model. The disabled Bayar button is informational only.
+
+P1C does not complete sales, record payment, move stock, write COGS or revenue, activate WAC, or run bootstrap. Checkout remains pending a later phase. Product UI intentionally omits costing fields.

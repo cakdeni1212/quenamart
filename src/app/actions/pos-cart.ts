@@ -23,7 +23,7 @@ function messageFor(code: string): string {
     POS_OUTLET_UNAVAILABLE: "Outlet POS aktif belum tersedia.",
     POS_CART_NOT_FOUND: "Keranjang tidak ditemukan atau bukan milik akun ini.",
     POS_CART_NOT_EDITABLE: "Keranjang ini tidak dapat diubah.",
-    POS_CART_STALE_REVISION: "Keranjang berubah di perangkat lain. Muat ulang sebelum melanjutkan.",
+    POS_CART_STALE_REVISION: "Transaksi berubah di perangkat lain. Data telah diperbarui.",
     POS_CART_REQUEST_REUSED: "ID permintaan sudah digunakan untuk perubahan yang berbeda.",
     POS_CART_QUANTITY_INVALID: "Jumlah harus lebih dari nol dengan maksimal tiga angka desimal.",
     POS_PRODUCT_UNAVAILABLE: "Barang tidak tersedia untuk outlet ini.",
@@ -100,9 +100,9 @@ async function transitionPosCart(operation: "park" | "resume" | "cancel", cartId
   return invoke(`pos_cart_${operation}`, { p_cart: cartId, p_expected_revision: expectedRevision, p_request_id: requestId });
 }
 
-export const parkPosCart = (cartId: string, expectedRevision: number, requestId: string) => transitionPosCart("park", cartId, expectedRevision, requestId);
-export const resumePosCart = (cartId: string, expectedRevision: number, requestId: string) => transitionPosCart("resume", cartId, expectedRevision, requestId);
-export const cancelPosCart = (cartId: string, expectedRevision: number, requestId: string) => transitionPosCart("cancel", cartId, expectedRevision, requestId);
+export async function parkPosCart(cartId: string, expectedRevision: number, requestId: string) { return transitionPosCart("park", cartId, expectedRevision, requestId); }
+export async function resumePosCart(cartId: string, expectedRevision: number, requestId: string) { return transitionPosCart("resume", cartId, expectedRevision, requestId); }
+export async function cancelPosCart(cartId: string, expectedRevision: number, requestId: string) { return transitionPosCart("cancel", cartId, expectedRevision, requestId); }
 
 export async function resolvePosBarcode(barcode: string): Promise<PosResult> {
   if (typeof barcode !== "string" || barcode.trim().length === 0 || barcode.trim().length > 128 || /[\u0000-\u001f\u007f]/.test(barcode)) {
@@ -121,4 +121,14 @@ export async function searchPosProducts(query: string): Promise<PosResult> {
   const result = await invoke("pos_search_products", { p_query: query.trim(), p_limit: 25 });
   if (!result.ok) return result;
   return { ok: true, value: { rows: Array.isArray(result.value.rows) ? result.value.rows.filter(record) : [], count: Number(result.value.count) || 0 } };
+}
+
+export async function ensureActivePosCart(): Promise<PosResult> {
+  const context = await allowedClient();
+  if (!context) return { ok: false, code: "FORBIDDEN", message: messageFor("POS_CART_ACCESS_DENIED") };
+  const { data, error } = await context.supabase.rpc("pos_cart_workspace_read", { p_cart_id: null, p_limit: 20 });
+  if (error || !record(data) || !Array.isArray(data.carts)) return { ok: false, code: "POS_READ_FAILED", message: "Keranjang POS belum dapat dimuat." };
+  const active = data.carts.find((cart) => record(cart) && cart.status === "ACTIVE");
+  if (record(active)) return { ok: true, value: active };
+  return createPosCart(crypto.randomUUID());
 }
