@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-11 — Native POS P1D-B atomic checkout capability
+
+- Added candidate migration `20260929350000_pos_atomic_checkout_v1.sql` with a single authenticated atomic checkout RPC, private WAC-gated POS costing helper, normalized sale-to-stock evidence links, and a guard against generic reversal of native POS sales.
+- Checkout reuses existing stock projection and C3B source-layer helpers. Disposable PostgreSQL runtime validation passed, including atomic rollback and final-unit concurrency. It does not enable Bayar UI, activate WAC, run production bootstrap, or add refund/gateway workflows.
+
 ## 2026-10-11 — Native POS P1D-A sale evidence foundation
 
 - Added local candidate migration `20260929340000_pos_sales_evidence_v1.sql` for immutable sale/item/payment evidence, checkout replay identity, nullable COGS evidence, sale-item links to C3B allocation evidence, `COMPLETED` cart enum/event values, and a private receipt-number sequence.

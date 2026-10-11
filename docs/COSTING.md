@@ -55,6 +55,10 @@ Internal WAC uses `numeric(20,8)` unit cost and `numeric(32,8)` inventory value.
 
 P1D-A adds only nullable, manager-protected sale-item COGS evidence and immutable links to future C3B layer allocations. It does not create a SALE_COGS event, consume a source layer, alter a cost projection, post stock, or change costing authority. Unvalued quantity already sold must later be resolved by appending sale-cost resolution evidence linked to its original outflow allocation; the original sale, movement, event, and allocation remain immutable.
 
+### P1D-B native POS depletion
+
+The P1D-B checkout costing helper runs only under an already active `WAC_ACTIVE` authority and under the outlet cutover advisory lock. It reuses the C3B proportional source-layer outflow planner/applier, consuming unvalued quantity before valued/provisional quantity. Valued inventory value depletes at aggregate current WAC, with exact remaining value consumed on last-valued-quantity depletion. Sale-item evidence retains valued, provisional, and unvalued quantities separately; unresolved cost remains NULL. P1D-B does not activate costing authority or bootstrap.
+
 Later iPos imports may update legacy `product_costs` according to the existing import contract, but must not reset or overwrite the separate WAC projection after activation. Existing pre-cutover stock, receipts, and invoices are represented by the explicit opening valuation; do not fabricate historical WAC events.
 
 ### C3A: receipt acquisition evidence and partial valuation (local review)
