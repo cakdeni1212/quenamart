@@ -53,6 +53,8 @@ Internal WAC uses `numeric(20,8)` unit cost and `numeric(32,8)` inventory value.
 5. Before POS launch, specify the consumed-versus-on-hand split for late invoice/landed-cost adjustments. Historical movement and sale rows stay immutable; already-consumed share is a current-period cost/COGS adjustment, while remaining value updates inventory/WAC.
 6. Supplier returns, customer returns, stock adjustments, and reversals need cost events coordinated with their stock operation.
 
+P1D-A adds only nullable, manager-protected sale-item COGS evidence and immutable links to future C3B layer allocations. It does not create a SALE_COGS event, consume a source layer, alter a cost projection, post stock, or change costing authority. Unvalued quantity already sold must later be resolved by appending sale-cost resolution evidence linked to its original outflow allocation; the original sale, movement, event, and allocation remain immutable.
+
 Later iPos imports may update legacy `product_costs` according to the existing import contract, but must not reset or overwrite the separate WAC projection after activation. Existing pre-cutover stock, receipts, and invoices are represented by the explicit opening valuation; do not fabricate historical WAC events.
 
 ### C3A: receipt acquisition evidence and partial valuation (local review)

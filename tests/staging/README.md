@@ -248,3 +248,13 @@ bash tests/staging/run-costing-stock-opname-source-layers.sh
 ```
 
 The runtime script creates synthetic bootstrap and opname/reversal evidence inside one transaction, enters `WAC_ACTIVE` only in that local transaction, forces deferred invariants, and rolls the entire scenario back. It checks opening layers, the `BOOTSTRAP_READY` retry gate, unvalued positive/negative opname, same-request replay, exact movement reversal, source-layer restoration, and source event linkage. Never point these scripts at production or use production IDs.
+
+# P1D-A sale evidence schema
+
+Run `bash tests/staging/run-pos-p1d-a-schema.sh` against the guarded local
+PostgreSQL 15 staging target. The runner verifies the source ends at 300000,
+clones it to a uniquely named disposable database, applies 310000 through
+340000, runs schema/constraint/RLS/immutability and COMPLETED-cart terminal
+checks inside a rollback-only transaction, then checks concurrent receipt
+sequence uniqueness and drops the clone. It creates no production data and
+has no checkout or stock/cost mutation operation.

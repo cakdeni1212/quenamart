@@ -6,6 +6,12 @@ Migration `20260929300000_costing_stock_opname_source_layers_v1.sql` adds three 
 
 Source-layer allocation is quantity provenance only and must never be used as FIFO/LIFO financial value. WAC and inventory value remain in `inventory_cost_projections` and `inventory_cost_events`. The C3B stock-operation wrapper installs a shared outlet cutover lock, a `BOOTSTRAP_READY` gate, and atomic costing for opname posting and movement reversal under `WAC_ACTIVE`. The migration only installs functions/schema; it does not create authority rows, execute bootstrap, or activate WAC.
 
+## P1D-A native POS sale evidence
+
+Migration `20260929340000_pos_sales_evidence_v1.sql` adds `sales`, immutable `sale_items` and `sale_payments`, `pos_checkout_requests`, manager-protected `sale_item_cost_evidence`, immutable `sale_item_cost_allocations`, and append-only future `sale_item_cost_resolutions`. It adds the `COMPLETED` cart enum/event values and a private global sale-number sequence. Price-history and C3B allocation composite identities support outlet/product-safe evidence links. Unknown COGS remains NULL; cost evidence separates valued, provisional, and unvalued quantities and supports later append-only cost resolution without reopening stock layers.
+
+P1D-A has no SECURITY DEFINER function, table writer, public receipt-number helper, checkout RPC, or client sale-table grants. Commercial sale tables are RLS-enabled/forced with all direct client privileges revoked pending bounded read contracts. Cost evidence SELECT is granted to authenticated only behind OWNER/ADMIN and active-outlet RLS; KASIR/GUDANG receive no rows. The cart transition and edit RPCs still reject `COMPLETED` carts. This migration does not create sales/payments, post SALE movements or SALE_COGS events, run bootstrap, or activate WAC. Atomic checkout remains P1D-B.
+
 ## Existing Supabase schema
 
 The Supabase project already has RLS enabled and contains:

@@ -82,7 +82,8 @@
 - Follow the frozen v1 product mapping and audit rules in `docs/IPOS_IMPORT.md` and `docs/AUDIT_RULES.md`; additional audit findings require a later versioned decision.
 - [x] P1B persisted cart schema/RPCs, KASIR barcode/search contracts, revision/idempotency guards, and price-change evidence; local rollback staging only, no checkout writer.
 - Implement P1C cashier POS UI with barcode scan, bounded search, multiple carts, park/resume, and explicit price-change acknowledgement.
-- Implement P1D atomic checkout/payment/stock OUT/SALE_COGS, gated to `WAC_ACTIVE`; then P1E receipt, transaction history, reporting, and go-live hardening.
+- [x] Implement P1D-A sale/payment/COGS evidence schema only; no checkout writer or sale completion path.
+- Implement P1D-B atomic checkout/payment/stock OUT/SALE_COGS, gated to `WAC_ACTIVE`; then P1D-C payment UI/receipt and P1E history, reporting, and go-live hardening.
 - Implement loyalty rules, member records, reward catalog, redemption, and point ledger.
 - Design future due-date reminder policy separately; external WhatsApp integration remains out of scope.
 - Implement reports and charts after accounting definitions and role permissions are agreed.

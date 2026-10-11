@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-11 — Native POS P1D-A sale evidence foundation
+
+- Added local candidate migration `20260929340000_pos_sales_evidence_v1.sql` for immutable sale/item/payment evidence, checkout replay identity, nullable COGS evidence, sale-item links to C3B allocation evidence, `COMPLETED` cart enum/event values, and a private receipt-number sequence.
+- The migration adds no checkout or sale writer, does not enable Bayar, and cannot complete carts through an authenticated RPC. No SALE movement, SALE_COGS event, payment execution, WAC activation, or bootstrap path is added.
+- Local disposable PostgreSQL 15 validation only; no production access or deployment.
+
 ## 2026-10-10 — Native POS P1B persisted cart foundation
 
 - Added migration `20260929330000_pos_cart_foundation_v1.sql` for persistent outlet-bound `ACTIVE`/`PARKED`/`CANCELLED` carts, item price evidence, append-only cart events, actor/payload-bound request replay, and revision guards.
