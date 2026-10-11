@@ -54,9 +54,9 @@ test("cart changes use fresh request identities and read-model revision guards",
   assert.match(actions, /requestId/);
 });
 
-test("cashier UI surfaces quantities, safe price states, totals, parked carts, and disabled payment", () => {
-  for (const phrase of ["Harga berubah", "Harga saat dimasukkan", "Harga terbaru", "Gunakan harga terbaru", "UNAVAILABLE", "TOTAL", "Tahan Transaksi", "Transaksi Ditahan", "Lanjutkan", "Batalkan Transaksi", "Pembayaran akan tersedia setelah modul checkout aktif."]) assert.ok(ui.includes(phrase), `missing ${phrase}`);
-  assert.match(ui, /className="pos-pay" disabled aria-disabled="true"/);
+test("cashier UI surfaces quantities, safe price states, totals, parked carts, and payment readiness", () => {
+  for (const phrase of ["Harga berubah", "Harga saat dimasukkan", "Harga terbaru", "Gunakan harga terbaru", "UNAVAILABLE", "TOTAL", "Tahan Transaksi", "Transaksi Ditahan", "Lanjutkan", "Batalkan Transaksi", "paymentReady"]) assert.ok(ui.includes(phrase), `missing ${phrase}`);
+  assert.match(ui, /className="pos-pay" disabled=\{!paymentReady\}/);
   assert.match(ui, /observed_total/);
   assert.match(ui, /observed_line_total/);
   assert.match(ui, /className="pos-remove-line"/);
@@ -89,7 +89,7 @@ test("success feedback expires while error feedback remains visible", () => {
   assert.match(ui, /pos-notice-success/);
 });
 
-test("P1C UI and actions contain no checkout or stock/costing writer", () => {
-  assert.doesNotMatch(ui + actions, /complete_sale|checkout\(|sale_payments|SALE_COGS|SALE.*stock|stock_balance_projection.*UPDATE|activate_wac|bootstrap/i);
-  assert.match(ui, /className="pos-pay" disabled/);
+test("P1C cart UI still contains no direct stock or costing writer", () => {
+  assert.doesNotMatch(ui + actions, /complete_sale|sale_payments|SALE_COGS|SALE.*stock|stock_balance_projection.*UPDATE|activate_wac|bootstrap/i);
+  assert.match(ui, /checkoutPos\(/);
 });

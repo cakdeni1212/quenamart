@@ -45,8 +45,7 @@ test('native sale stock evidence is normalized and generic reversal is blocked',
   assert.match(migration, /UPDATE public\.pos_carts SET status='COMPLETED'/);
 });
 
-test('P1D-B does not enable Bayar or add cashier-facing cost data', () => {
-  assert.match(ui, /disabled/);
+test('P1D-B migration does not expose cashier-facing cost data', () => {
   assert.doesNotMatch(ui, /pos_checkout_complete|SALE_COGS|inventory_cost_apply_pos_sale/);
   assert.doesNotMatch(migration.slice(migration.indexOf('CREATE FUNCTION public.pos_checkout_complete')), /resolved_cogs_amount|provisional_cogs_amount|current_wac|inventory_value/);
 });

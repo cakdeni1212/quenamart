@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, ensureActivePosCart, parkPosCart, resolvePosBarcode, resumePosCart, searchPosProducts, setPosCartItemQuantity } from "@/app/actions/pos-cart";
+import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, checkoutPos, createPosCart, ensureActivePosCart, parkPosCart, readPosSaleReceipt, resolvePosBarcode, resumePosCart, searchPosProducts, setPosCartItemQuantity } from "@/app/actions/pos-cart";
+import { PosReceipt, type PosReceiptData } from "@/components/pos/pos-receipt";
 
 type Row = Record<string, unknown>;
 type Cart = Row & { id: string; status: string; revision: number; items: Row[] };
@@ -19,10 +20,22 @@ export function PosWorkspace({ initialCarts, initialError }: { initialCarts: Row
   const [results, setResults] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(initialError ?? "");
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "QRIS" | "CARD" | "E_WALLET">("CASH");
+  const [cashReceived, setCashReceived] = useState("");
+  const [referenceText, setReferenceText] = useState("");
+  const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
+  const [receiptSize, setReceiptSize] = useState<"58" | "80">("80");
   const input = useRef<HTMLInputElement>(null);
+  const checkoutRequestId = useRef<string | null>(null);
+  const checkoutInFlight = useRef(false);
   const searchSequence = useRef(0);
   const cart = carts.find((x) => x.status === "ACTIVE");
   const parked = carts.filter((x) => x.status === "PARKED");
+  const total = Number(cart?.observed_total ?? 0);
+  const received = Number(cashReceived || 0);
+  const paymentReady = Boolean(cart && cart.status === "ACTIVE" && cart.items.length > 0
+    && cart.items.every((item) => priceStatus(item) === "CURRENT") && !busy);
   const isSuccessNotice = ["Barang ditambahkan", "Transaksi ditahan", "Transaksi dilanjutkan", "Transaksi dibatalkan", "Harga terbaru digunakan"].includes(notice);
 
   const reload = useCallback(() => router.refresh(), [router]);
@@ -102,6 +115,64 @@ export function PosWorkspace({ initialCarts, initialError }: { initialCarts: Row
     finishMutation(result.ok ? "Harga terbaru digunakan" : result.message);
   };
 
+  const submitCheckout = async () => {
+    if (!cart || !paymentReady || checkoutInFlight.current || (paymentMethod === "CASH" && (!cashReceived || received < total))) return;
+    checkoutInFlight.current = true;
+    checkoutRequestId.current ??= uuid();
+    setBusy(true); setNotice("");
+    try {
+      const result = await checkoutPos({
+        requestId: checkoutRequestId.current, cartId: cart.id, expectedRevision: cart.revision, method: paymentMethod,
+        ...(paymentMethod === "CASH" ? { cashReceivedAmount: cashReceived } : {}),
+        ...(referenceText.trim() ? { referenceText: referenceText.trim() } : {}),
+      });
+      if (!result.ok) {
+        checkoutInFlight.current = false;
+        setBusy(false); setNotice(result.message);
+        if (["POS_CART_STALE", "POS_PRICE_CHANGED", "POS_PRICE_UNAVAILABLE", "POS_ALREADY_COMPLETED", "POS_INSUFFICIENT_STOCK"].includes(result.code)) reload();
+        return;
+      }
+      const response = result.value;
+      const saleId = String(response.sale_id ?? "");
+      const read = saleId ? await readPosSaleReceipt(saleId) : null;
+      let data = read?.ok ? read.value : response;
+      if (!Array.isArray(data.payments)) data = { ...data, payments: [{
+        method: data.payment_method, applied_amount: data.grand_total,
+        received_amount: data.cash_received_amount, change_amount: data.change_amount,
+        reference_text: data.reference_text,
+      }] };
+      checkoutRequestId.current = null;
+      setReceipt(data as unknown as PosReceiptData);
+      setPaymentOpen(false); setBusy(false); setNotice("");
+    } catch {
+      checkoutInFlight.current = false;
+      setBusy(false);
+      setNotice("Koneksi terputus. Periksa lalu coba konfirmasi lagi dengan data pembayaran yang sama.");
+    }
+  };
+
+  const startNewTransaction = async () => {
+    if (busy) return;
+    setBusy(true);
+    const result = await createPosCart(uuid());
+    setBusy(false);
+    if (!result.ok) { setNotice(result.message); return; }
+    setReceipt(null); setPaymentOpen(false); setCashReceived(""); setReferenceText(""); checkoutRequestId.current = null;
+    reload();
+    window.setTimeout(() => input.current?.focus(), 80);
+  };
+
+  const completedPayment = receipt?.payments[0];
+  const completedMethod = String(completedPayment?.method ?? "");
+  const methodLabel: Record<string, string> = { CASH: "Tunai", QRIS: "QRIS", CARD: "Kartu", E_WALLET: "E-Wallet" };
+
+  if (receipt) return <section className="pos-success surface-card" aria-live="polite">
+    <div className="pos-success-copy"><span className="pos-success-mark" aria-hidden="true">✓</span><span className="eyebrow">PEMBAYARAN TERCATAT</span><h2>Transaksi Berhasil</h2><strong>{receipt.sale_number}</strong><p>{new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(receipt.completed_at))} · {receipt.cashier_label}</p><p>{rupiah(receipt.grand_total)} · {methodLabel[completedMethod] ?? "Pembayaran"}</p>{completedMethod === "CASH" && <p>Diterima {rupiah(completedPayment?.received_amount)} · Kembalian {rupiah(completedPayment?.change_amount)}</p>}</div>
+    <div className="pos-receipt-toolbar"><label>Ukuran struk<select value={receiptSize} onChange={(event) => setReceiptSize(event.target.value as "58" | "80")}><option value="58">58 mm</option><option value="80">80 mm</option></select></label><button type="button" className="pos-secondary" onClick={() => window.print()}>Cetak Struk</button><button type="button" className="pos-pay" disabled={busy} onClick={() => void startNewTransaction()}>{busy ? "Menyiapkan…" : "Transaksi Baru"}</button></div>
+    <div className="pos-receipt-preview"><PosReceipt receipt={receipt} size={receiptSize} /></div>
+    <div className="pos-print-root"><PosReceipt receipt={receipt} size={receiptSize} /></div>
+  </section>;
+
   return <div className="pos-workspace">
     <section className="pos-entry surface-card" aria-label="Cari dan masukkan produk">
       <div className="pos-section-head"><div><span className="eyebrow">INPUT BARANG</span><h2>Scan atau cari produk</h2></div><span className="pos-live-dot">Siap scan</span></div>
@@ -118,9 +189,11 @@ export function PosWorkspace({ initialCarts, initialError }: { initialCarts: Row
       <div className="pos-items">{cart?.items.length ? cart.items.map((item) => <article className="pos-item" key={String(item.id)}><div className="pos-item-main"><strong>{text(item.name)}</strong><small>{text(item.sku)} · {rupiah(item.observed_unit_price)} / unit</small>{priceStatus(item) === "CHANGED" && <div className="pos-price-changed"><b>Harga berubah</b><span>Harga saat dimasukkan: {rupiah(item.observed_unit_price)}</span><span>Harga terbaru: {rupiah(item.current_unit_price)}</span><button type="button" disabled={busy} onClick={() => void acknowledge(item)}>Gunakan harga terbaru</button></div>}{priceStatus(item) === "UNAVAILABLE" && <div className="pos-price-unavailable">Harga jual belum tersedia</div>}</div><div className="pos-item-controls"><button type="button" aria-label={`Kurangi ${text(item.name)}`} disabled={busy} onClick={() => void setQuantity(item, String(Math.max(0, Number(item.quantity) - 1)))}>−</button><input aria-label={`Jumlah ${text(item.name)}`} inputMode="decimal" defaultValue={text(item.quantity)} key={`${item.id}:${item.quantity}`} onBlur={(event) => { if (event.currentTarget.value !== String(item.quantity)) void setQuantity(item, event.currentTarget.value); }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /><button type="button" aria-label={`Tambah ${text(item.name)}`} disabled={busy} onClick={() => void setQuantity(item, String(Number(item.quantity) + 1))}>+</button><button type="button" className="pos-remove-line" aria-label={`Hapus ${text(item.name)}`} disabled={busy} onClick={() => void setQuantity(item, "0")}>×</button></div><strong className="pos-line-total">{rupiah(item.observed_line_total)}</strong></article>) : <div className="pos-empty"><strong>Belum ada barang</strong><small>Scan barcode atau cari produk untuk mulai transaksi.</small></div>}</div>
       <div className="pos-total"><span>TOTAL</span><strong>{rupiah(cart?.observed_total)}</strong></div>
       <div className="pos-cart-actions"><button type="button" className="pos-hold" disabled={!cart || busy} onClick={() => cart && void transition(cart, "park")}>Tahan Transaksi</button><button type="button" className="pos-cancel" disabled={!cart || busy} onClick={() => cart && void transition(cart, "cancel")}>Batalkan Transaksi</button></div>
-      <button type="button" className="pos-pay" disabled aria-disabled="true">Bayar</button><p className="pos-pay-note">Pembayaran akan tersedia setelah modul checkout aktif.</p>
+      <button type="button" className="pos-pay" disabled={!paymentReady} aria-disabled={!paymentReady} onClick={() => { setNotice(""); setPaymentOpen(true); checkoutRequestId.current ??= uuid(); }}>Bayar</button>
+      {!paymentReady && <p className="pos-pay-note">Periksa barang dan status harga sebelum pembayaran.</p>}
     </section>
 
     <section className={`pos-parked surface-card${parked.length ? " pos-parked-has-items" : " pos-parked-empty-state"}`}><header><div><span className="eyebrow">PARKIR</span><h2>Transaksi Ditahan <small>{parked.length}</small></h2></div></header>{parked.length ? <ul>{parked.map((item) => <li key={item.id}><div><strong>Transaksi ditahan</strong><small>{new Date(String(item.updated_at)).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })} · {item.items.length} barang</small></div><b>{rupiah(item.observed_total)}</b><button type="button" disabled={busy || !cart || cart.items.length > 0} title={cart?.items.length ? "Tahan transaksi aktif sebelum melanjutkan" : undefined} onClick={() => void transition(item, "resume")}>Lanjutkan</button><button type="button" className="pos-cancel-small" disabled={busy} aria-label="Batalkan transaksi ditahan" onClick={() => void transition(item, "cancel")}>×</button></li>)}</ul> : <p className="pos-parked-empty">Belum ada transaksi yang ditahan.</p>}</section>
+    {paymentOpen && <div className="pos-payment-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setPaymentOpen(false); }}><section className="pos-payment-panel surface-card" role="dialog" aria-modal="true" aria-labelledby="pos-payment-title"><header><div><span className="eyebrow">PEMBAYARAN</span><h2 id="pos-payment-title">Pilih metode pembayaran</h2></div><button type="button" className="pos-dialog-close" aria-label="Tutup pembayaran" disabled={busy} onClick={() => setPaymentOpen(false)}>×</button></header><div className="pos-payment-total"><span>TOTAL BELANJA</span><strong>{rupiah(cart?.observed_total)}</strong></div><div className="pos-payment-methods" role="group" aria-label="Metode pembayaran">{([ ["CASH", "Tunai"], ["QRIS", "QRIS"], ["CARD", "Kartu"], ["E_WALLET", "E-Wallet"] ] as const).map(([method, label]) => <button type="button" key={method} className={paymentMethod === method ? "selected" : ""} aria-pressed={paymentMethod === method} disabled={busy} onClick={() => { if (paymentMethod !== method) checkoutRequestId.current = uuid(); setPaymentMethod(method); }}>{label}</button>)}</div>{paymentMethod === "CASH" ? <div className="pos-cash-fields"><label htmlFor="pos-cash-received">UANG DITERIMA</label><div className="pos-cash-input"><span>Rp</span><input id="pos-cash-received" autoFocus inputMode="decimal" type="number" min="0" step="0.01" value={cashReceived} onChange={(event) => { if (cashReceived !== event.target.value) checkoutRequestId.current = uuid(); setCashReceived(event.target.value); }} placeholder="0" disabled={busy} /></div><div className="pos-cash-quick">{[Math.ceil(total), 20000, 50000, 100000].filter((amount, index, all) => amount >= total && all.indexOf(amount) === index).map((amount) => <button type="button" key={amount} disabled={busy} onClick={() => { if (cashReceived !== String(amount)) checkoutRequestId.current = uuid(); setCashReceived(String(amount)); }}>{amount === Math.ceil(total) ? "Uang Pas" : rupiah(amount)}</button>)}</div><div className="pos-change"><span>KEMBALIAN</span><strong>{rupiah(Math.max(0, received - total))}</strong></div>{cashReceived && received < total && <p className="pos-payment-error" role="status">Uang diterima belum mencukupi.</p>}</div> : <div className="pos-noncash-note">Nominal pembayaran {rupiah(total)}. Pilih metode yang digunakan pelanggan.</div>}<label className="pos-reference" htmlFor="pos-payment-reference">Referensi (opsional)<input id="pos-payment-reference" maxLength={160} value={referenceText} onChange={(event) => { if (referenceText !== event.target.value) checkoutRequestId.current = uuid(); setReferenceText(event.target.value); }} disabled={busy} /></label>{notice && <p className="pos-payment-error" role="alert">{notice}</p>}<div className="pos-payment-actions"><button type="button" className="pos-secondary" disabled={busy} onClick={() => setPaymentOpen(false)}>Kembali</button><button type="button" className="pos-pay" disabled={!paymentReady || busy || (paymentMethod === "CASH" && (!cashReceived || received < total))} onClick={() => void submitCheckout()}>{busy ? "Memproses pembayaran…" : "Konfirmasi Pembayaran"}</button></div></section></div>}
   </div>;
 }

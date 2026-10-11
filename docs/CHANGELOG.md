@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-11 — Native POS P1D-C payment and receipt UI
+
+- Added cashier payment selection for Tunai, QRIS, Kartu, and E-Wallet using the existing atomic P1D-B checkout RPC. The interface shows cash received/change, blocks obvious client-side readiness issues and duplicate submissions, and presents a completed transaction only after checkout succeeds.
+- Added a bounded role/outlet-authorized commercial receipt read, 58 mm / 80 mm browser-print layouts, and an explicit Transaksi Baru action. No payment gateway, direct printer integration, costing receipt data, WAC activation, or bootstrap was added.
+
 ## 2026-10-11 — Native POS P1D-B atomic checkout capability
 
 - Added candidate migration `20260929350000_pos_atomic_checkout_v1.sql` with a single authenticated atomic checkout RPC, private WAC-gated POS costing helper, normalized sale-to-stock evidence links, and a guard against generic reversal of native POS sales.

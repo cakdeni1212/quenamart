@@ -83,7 +83,7 @@
 - [x] P1B persisted cart schema/RPCs, KASIR barcode/search contracts, revision/idempotency guards, and price-change evidence; local rollback staging only, no checkout writer.
 - [x] Implement P1C cashier POS UI with barcode scan, bounded search, multiple carts, park/resume, and explicit price-change acknowledgement.
 - [x] Implement P1D-A sale/payment/COGS evidence schema only; no checkout writer or sale completion path.
-- [x] Implement and runtime-validate the P1D-B atomic checkout/payment/stock OUT/SALE_COGS backend, gated to `WAC_ACTIVE`; awaiting scoped commit review. P1D-C payment UI/receipt and P1E history, reporting, and go-live hardening remain.
+- [x] Implement and runtime-validate the P1D-B atomic checkout/payment/stock OUT/SALE_COGS backend, gated to `WAC_ACTIVE`; committed and deployed as a capability. P1D-C payment UI/receipt is implemented locally; P1E history, reporting, and go-live hardening remain.
 - Implement loyalty rules, member records, reward catalog, redemption, and point ledger.
 - Design future due-date reminder policy separately; external WhatsApp integration remains out of scope.
 - Implement reports and charts after accounting definitions and role permissions are agreed.

@@ -24,6 +24,7 @@ function messageFor(code: string): string {
     POS_CART_NOT_FOUND: "Keranjang tidak ditemukan atau bukan milik akun ini.",
     POS_CART_NOT_EDITABLE: "Keranjang ini tidak dapat diubah.",
     POS_CART_STALE_REVISION: "Transaksi berubah di perangkat lain. Data telah diperbarui.",
+    POS_CART_STALE: "Transaksi berubah di perangkat lain. Data telah diperbarui.",
     POS_CART_REQUEST_REUSED: "ID permintaan sudah digunakan untuk perubahan yang berbeda.",
     POS_CART_QUANTITY_INVALID: "Jumlah harus lebih dari nol dengan maksimal tiga angka desimal.",
     POS_PRODUCT_UNAVAILABLE: "Barang tidak tersedia untuk outlet ini.",
@@ -36,6 +37,16 @@ function messageFor(code: string): string {
     POS_CART_TRANSITION_INVALID: "Status keranjang sudah berubah. Muat ulang.",
     POS_CART_OPERATION_INVALID: "Perintah keranjang tidak valid.",
     POS_CART_ITEM_NOT_FOUND: "Barang tidak ditemukan di keranjang ini.",
+    POS_COSTING_NOT_ACTIVE: "Sistem kasir belum diaktifkan untuk transaksi penjualan.",
+    POS_COST_PROJECTION_STALE: "Data transaksi perlu diperbarui. Muat ulang lalu coba kembali.",
+    POS_INSUFFICIENT_STOCK: "Stok barang tidak mencukupi. Periksa transaksi dan muat ulang.",
+    POS_PRICE_CHANGED: "Harga berubah. Periksa dan konfirmasi harga terbaru sebelum membayar.",
+    POS_ALREADY_COMPLETED: "Transaksi ini sudah selesai.",
+    POS_CART_NOT_ACTIVE: "Transaksi tidak aktif. Muat ulang keranjang.",
+    POS_CART_EMPTY: "Tambahkan barang sebelum melanjutkan pembayaran.",
+    POS_PAYMENT_INVALID: "Pembayaran tidak valid. Periksa jumlah uang yang diterima.",
+    POS_CHECKOUT_CONFLICT: "Permintaan pembayaran berbeda dari transaksi sebelumnya. Muat ulang data.",
+    POS_UNAUTHORIZED: "Transaksi tidak dapat diakses oleh akun ini.",
     BARCODE_NOT_FOUND: "Barcode belum terdaftar.",
     BARCODE_AMBIGUOUS: "Barcode cocok dengan beberapa barang. Cari barang secara manual.",
   };
@@ -121,6 +132,42 @@ export async function searchPosProducts(query: string): Promise<PosResult> {
   const result = await invoke("pos_search_products", { p_query: query.trim(), p_limit: 25 });
   if (!result.ok) return result;
   return { ok: true, value: { rows: Array.isArray(result.value.rows) ? result.value.rows.filter(record) : [], count: Number(result.value.count) || 0 } };
+}
+
+export async function checkoutPos(input: {
+  requestId: string;
+  cartId: string;
+  expectedRevision: number;
+  method: "CASH" | "QRIS" | "CARD" | "E_WALLET";
+  cashReceivedAmount?: string;
+  referenceText?: string;
+}): Promise<PosResult> {
+  if (!validUuid(input.requestId) || !validUuid(input.cartId)
+      || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1
+      || !["CASH", "QRIS", "CARD", "E_WALLET"].includes(input.method)
+      || (input.method === "CASH" && (!input.cashReceivedAmount || !/^(?:0|[1-9][0-9]{0,29})(?:\.[0-9]{1,2})?$/.test(input.cashReceivedAmount)))
+      || (input.method !== "CASH" && input.cashReceivedAmount !== undefined)
+      || (input.referenceText !== undefined && (input.referenceText.trim().length === 0 || input.referenceText.length > 160))) {
+    return { ok: false, code: "POS_PAYMENT_INVALID", message: messageFor("POS_PAYMENT_INVALID") };
+  }
+  return invoke("pos_checkout_complete", {
+    p_request_id: input.requestId,
+    p_cart_id: input.cartId,
+    p_expected_cart_revision: input.expectedRevision,
+    p_payment_method: input.method,
+    p_cash_received_amount: input.method === "CASH" ? input.cashReceivedAmount : null,
+    p_reference_text: input.referenceText?.trim() || null,
+  });
+}
+
+export async function readPosSaleReceipt(saleId: string): Promise<PosResult> {
+  if (!validUuid(saleId)) return { ok: false, code: "INVALID_REQUEST", message: "Struk tidak dapat dimuat." };
+  const result = await invoke("pos_sale_receipt_read", { p_sale_id: saleId });
+  if (!result.ok) return result;
+  if (!record(result.value) || !Array.isArray(result.value.items) || !Array.isArray(result.value.payments)) {
+    return { ok: false, code: "POS_RECEIPT_NOT_FOUND", message: "Struk tidak tersedia untuk akun ini." };
+  }
+  return result;
 }
 
 export async function ensureActivePosCart(): Promise<PosResult> {
