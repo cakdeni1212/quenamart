@@ -176,3 +176,97 @@ against `product_inventory.minimum_quantity`. Tempo outstanding is limited to
 finalized TEMPO invoices and reduced by their payment allocations. The read
 contract returns bounded shortlists and no source-layer, HPP, WAC, inventory
 valuation, or raw COGS details.
+
+## First go-live runbook (preparation only)
+
+This is an operator checklist, not permission to execute. The current checkout
+has not verified production state: linked Supabase inspection failed because
+no CLI access token was available. Do not infer that production is clean. No
+reset, import, cutover, HPP approval, bootstrap, WAC activation, or sale was
+performed for this runbook.
+
+### Data disposition
+
+| Disposition | Data | Rule |
+| --- | --- | --- |
+| Preserve | Auth users, profiles, roles/status, OWNER identity, outlets, configuration, schema and migration history | Never bulk-delete identities or change the schema as part of rehearsal reset. Manually review employee accounts intended for production; deactivate individually only after OWNER confirmation. |
+| Preserve | Suppliers and product identities | Supplier rows are reusable master data referenced by transaction FKs. Keep native products and manually curated master data; compare native SKUs with the final iPos file before import. Do not convert a native product into an imported product implicitly. |
+| Preserve | Completed/posted stock, purchase, return, payment, sale, audit and event evidence | Posted evidence is historical and immutable. Do not delete it to simulate a clean opening. If production contains unexpected posted records, stop and reconcile them explicitly. |
+| Rebuild | iPos opening snapshot | Upload the original final XLSX as a new import batch, normalize, review, and commit. Retain earlier batches/rows/commits as history. The latest completed normalization commit must be the selected opening snapshot. |
+| Rebuild | Opening stock authority | Use `stock_opening_cutover` once after final import. It preserves old movements and closes their authority period; the new period's imported baselines equal the accepted snapshot and movement delta starts at zero. Native zero baselines are advanced unchanged by the 380000 compatibility logic. |
+| Recreate | Opening HPP acceptance | Do not reuse rehearsal acceptance. Prepare a fresh batch from the final snapshot after stock cutover, review every exception, record explicit dispositions, then have OWNER approve. Do not delete acceptance evidence. |
+| Cancel through existing lifecycle | ACTIVE/PARKED carts, open opname, draft receipts/invoices, draft manual corrections and draft supplier returns | Use their supported cancellation/transition operations and retain events. Cutover rejects ACTIVE/PARKED carts; COUNTING/REVIEW opname; DRAFT receipts/invoices/corrections/returns; incomplete checkout requests; pending stock operations; and active PREPARED/APPROVED/CONSUMED HPP acceptance. |
+| Manual review / stop | Finalized supplier invoices/payables, payments/allocations, posted receipts/returns/corrections/opname, native products, product field overrides, quantity overrides, unresolved audit findings, any sales or costing evidence | These are not rehearsal-reset candidates for bulk deletion. Finalized payable balances remain real Tempo obligations under current semantics. Active quantity overrides block cutover. A quantity override or any unexpected posting/cost/sale needs an explicit reviewed disposition before proceeding. |
+
+The import identity rule is the existing global, trimmed, case-sensitive SKU.
+Barcode conflicts are audit findings and must be resolved before opening. Active
+field overrides may continue to win over imported values while recording a
+conflict; review barcode, rack, HPP, and selling-price overrides individually.
+Quantity overrides are not carried into an accepted cutover. The final iPos
+export is authoritative for the last pre-Quena product/barcode/price/HPP
+candidate/rack/stock observation. From the accepted opening onward, Quena is
+authoritative for movements, receipts, sales, returns, corrections, WAC, and
+COGS. Do not hand-edit the XLSX unless an existing importer rule requires it.
+
+There is no general rehearsal reset RPC, no database maintenance-mode switch,
+and no OWNER-only reset request ledger. Therefore there is no safe bulk reset
+command today. Freeze writes during the maintenance window and use only
+existing audited cancellation workflows for eligible drafts. Never use
+`TRUNCATE ... CASCADE` or ad hoc DELETE statements. A dedicated reviewed reset
+contract is required before automating cancellation or invalidating rehearsal
+HPP acceptance; the deployed HPP API has no general operator invalidation call.
+
+### Required hard gates
+
+Each phase is GO only when its verification passes and the named OWNER records
+the decision. Any failed or unavailable check is NO-GO.
+
+| Phase | Action | Verify / GO condition |
+| --- | --- | --- |
+| A — Backup | Create a recoverable database backup/export and separately preserve the final source workbook and any required Storage objects. | `BACKUP VERIFIED`: record project ref, timestamp, operator, backup location, successful readability/restore verification, and retention. Confirm the plan's managed backup/PITR capability in Supabase before relying on it. No backup was verified for this audit. |
+| B — Maintenance | Announce and start an outlet-wide write freeze; stop iPos operations at the agreed final snapshot time and block staff writes in Quena. | No cashier, receiving, stock, or import writes can race with the snapshot/cutover. There is no repository maintenance-mode switch; enforce this operationally. |
+| C — Rehearsal preparation | Inspect every blocker. Cancel only eligible draft records through supported RPCs; cancel ACTIVE/PARKED carts and open opname through their workflows. Manually disposition accounts, suppliers, overrides, finalized invoices, and posted records. | No active/parked cart, open opname, draft receipt/invoice/correction/return, incomplete checkout, pending stock operation, quantity override, or active HPP batch. Unexpected sales, cost evidence, WAC/BOOTSTRAP_READY authority, or posted rehearsal financial obligations are NO-GO pending review. Do not delete immutable history. |
+| D — Final iPos import | Export the latest unedited XLSX, upload via the existing iPos import workspace, run preflight, normalize, then commit the reviewed batch. | Preserve the original file and batch IDs. The selected commit is COMPLETED, outlet-correct, latest, and has no unresolved identity/import failures. Review SKU/native collisions, duplicate barcodes, active overrides, and row-count/quantity sanity. |
+| E — Opening audit | Review normalized product count, stock observations, price/HPP source coverage, barcodes, rack values, import findings, and account/OWNER access. | Every blocker has an explicit resolution; quantity is valid at 3 decimals, nonnegative, and complete for the cutover population. Confirm the final source totals against iPos before advancing. |
+| F — Stock opening | As authenticated OWNER, call `stock_opening_cutover` with the outlet, latest completed commit, current open period ID, a fresh request UUID, and exact confirmation `OPENING-STOCK-CUTOVER:<outlet-uuid>:<commit-uuid>`. | RPC succeeds once; verify stored request/items, new open `QUENA_MOVEMENT_LEDGER` period, every imported projection equals the accepted snapshot with delta 0, native products remain at zero without iPos provenance, and old period/movements/events remain intact. Same request and same payload is replay-safe; do not retry with changed identity. If RPC fails, stop and inspect its result before any new request. |
+| G — HPP Awal | Prepare a fresh batch with `prepare_initial_hpp_acceptance(p_outlet_id, p_request_id)`. Review candidates and exceptions; resolve each exception with an explicit disposition/reason; OWNER calls `approve_initial_hpp_acceptance(p_batch_id, p_request_id)` only after evidence is current. | Batch is APPROVED from the final snapshot; no unresolved blocker; quantities and source fingerprints still match. Zero-stock native products receive no opening inventory value. Never turn unknown positive-stock HPP into zero cost. |
+| H — Bootstrap | Only after the bootstrap/HPP contract issue below is fixed and verified, authenticated authorized operator calls `inventory_cost_bootstrap_outlet(p_outlet_id, p_request_id)` once. | Result is `BOOTSTRAP_READY`; projection count matches stock projection; valued, unvalued and physical quantities reconcile; inventory value and source layers reconcile to approved opening evidence; unresolved opening quantity is zero unless a separately approved policy explicitly permits it. Replay only with the same request. |
+| I — WAC activation | Do not issue a direct table UPDATE. Require an audited, authenticated OWNER activation operation with precondition checks before setting WAC_ACTIVE. | **Currently NO-GO:** no WAC activation RPC exists in committed migrations. A forward-only migration and staging proof are required. After it exists, verify actor/time/bootstrap evidence, cutover and HPP approval, projections, no unsafe drafts, and the approved unvalued-stock policy. |
+| J — POS E2E | After WAC is active and cashier access is verified, make one documented low-risk real checkout using an approved known product/payment. | One sale/payment/movement/COGS chain, exact stock decrement, source allocations and sale-time evidence; receipt renders; `/transaksi` shows the immutable sale; Owner dashboard increments revenue/count/average/payment and displays gross profit only if evidence is resolved. This creates a real sale and is not part of this preparation. |
+| K — Go-live acceptance | Run OWNER, ADMIN, KASIR, GUDANG, and inactive-account acceptance checks; verify future Android uses the same Supabase Auth UUID/profile/role identity. | OWNER signs the checklist, the cashier and warehouse boundaries pass, no costing data leaks, and all operational owners accept the final report. |
+
+### Current contract gaps and stop points
+
+The committed bootstrap function currently chooses opening HPP by joining
+`product_costs.hpp` to valid iPos rows and a matching latest
+`SUDAH_DIVERIFIKASI` field-audit review. It does not require or consume an
+`APPROVED` `inventory_cost_hpp_acceptance_batches` record. That is not the
+locked go-live sequence above. Do not call bootstrap until a forward-only
+contract makes approved HPP acceptance the authoritative bootstrap input and
+staging tests prove unresolved HPP cannot be silently valued as zero.
+
+The authority trigger permits only `BOOTSTRAP_READY` → `WAC_ACTIVE`, requires
+`activated_by = auth.uid()` and an activation timestamp, and blocks direct
+client DML. No authenticated activation RPC exists in the committed migration
+set. Do not bypass it with service credentials or direct SQL; add and test a
+narrow OWNER-only audited activation operation first.
+
+The cutover RPC is OWNER-only and requires the exact confirmation above. It
+serializes on `COST_BOOTSTRAP_OUTLET:<outlet>`, verifies the latest completed
+normalization commit and previous open period, and locks affected evidence
+tables. It rejects active/parked carts, open opname, draft purchasing/correction/
+return records, pending operations, unfinished checkout, active HPP batches,
+sales, costing authority/evidence, and active quantity overrides. Its unique
+outlet request means this is a one-time action; it has no rollback to the old
+effective baseline. Old ledger evidence remains queryable, while the new period
+starts with accepted snapshot baseline and zero movement delta.
+
+Before relying on backup or any production gate, run a read-only production
+audit under an authenticated operator session and save the result. Production
+counts, WAC state, HPP batch state, open drafts, and migration frontier remain
+unverified in this preparation because linked Supabase authentication was
+unavailable. Account V1 uses one Supabase Auth identity linked to
+`public.profiles`; retain intended employee accounts and review them
+individually. No outlet-membership table exists yet, so the current access
+context is single-outlet. Future Android clients should authenticate the same
+user UUID and use the same profile/role guards.
