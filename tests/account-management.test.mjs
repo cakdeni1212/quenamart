@@ -113,12 +113,15 @@ test("account input normalizes email and validates supported human roles", () =>
 });
 
 test("workspace create actions share the canonical primary action style", () => {
-  assert.match(workspace, /primaryAction\.action} type="button" onClick=\{show\}>\+ Tambah Akun/);
-  assert.match(primaryActionStyles, /min-height: 39px/);
-  assert.match(primaryActionStyles, /background: #316447/);
+  assert.match(workspace, /primaryAction\.primary} type="button" onClick=\{show\}>\+ Tambah Akun/);
+  assert.match(primaryActionStyles, /\.primary[\s\S]*?min-height: 39px[\s\S]*?background: #316447/);
   assert.match(primaryActionStyles, /:hover/);
   assert.match(primaryActionStyles, /:focus-visible/);
   assert.match(primaryActionStyles, /:disabled/);
-  assert.match(read("../app/(workspace)/produk/page.tsx"), /primaryAction\.action/);
-  assert.match(read("../app/(workspace)/transaksi/page.tsx"), /primaryAction\.action/);
+  assert.match(primaryActionStyles, /\.secondary[\s\S]*?min-height: 42px[\s\S]*?background: #f2f7ef[\s\S]*?color: #426743/);
+  assert.match(primaryActionStyles, /\.danger/);
+  assert.match(primaryActionStyles, /\.ghost/);
+  assert.match(workspace, /primaryAction\.secondary} type="submit">Terapkan/);
+  assert.match(read("../app/(workspace)/produk/page.tsx"), /primaryAction\.primary/);
+  assert.match(read("../app/(workspace)/transaksi/page.tsx"), /primaryAction\.primary/);
 });

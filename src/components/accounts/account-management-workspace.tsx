@@ -40,7 +40,7 @@ export function CreateAccountButton() {
   }
 
   return <>
-    <button className={primaryAction.action} type="button" onClick={show}>+ Tambah Akun</button>
+    <button className={primaryAction.primary} type="button" onClick={show}>+ Tambah Akun</button>
     {open && <div className={styles.backdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="account-create-title">
         <div className={styles.dialogHead}><div><span className="eyebrow">UNDANG ANGGOTA TIM</span><h2 id="account-create-title">Tambah Akun</h2></div><button type="button" className={styles.close} onClick={() => setOpen(false)} disabled={busy} aria-label="Tutup">×</button></div>
@@ -49,7 +49,7 @@ export function CreateAccountButton() {
           <label>Nama lengkap *<input required maxLength={120} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
           <label>Email / login *<input required maxLength={254} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <label>Hak akses *<select value={role} onChange={(event) => setRole(event.target.value as (typeof ACCOUNT_ROLES)[number])}>{ACCOUNT_ROLES.map((item) => <option key={item} value={item}>{item}</option>)}</select><small>{ACCOUNT_ROLE_DESCRIPTIONS[role]}</small></label>
-          <div className={styles.formActions}><button type="button" className="button-secondary" disabled={busy} onClick={() => setOpen(false)}>Batal</button><button type="submit" className="button-primary" disabled={busy}>{busy ? "Mengirim undangan…" : "Kirim Undangan"}</button></div>
+          <div className={styles.formActions}><button type="button" className={primaryAction.secondary} disabled={busy} onClick={() => setOpen(false)}>Batal</button><button type="submit" className="button-primary" disabled={busy}>{busy ? "Mengirim undangan…" : "Kirim Undangan"}</button></div>
           {notice && <p className={notice.ok ? styles.success : styles.error} role={notice.ok ? "status" : "alert"}>{notice.text}</p>}
         </form>
       </section>
@@ -109,7 +109,7 @@ export function AccountManagementWorkspace(props: {
       <label className={styles.search}>Cari pengguna<input name="q" type="search" defaultValue={search} placeholder="Nama atau email" /></label>
       <label>Role<select name="role" defaultValue={roleFilter}><option value="">Semua role</option>{["OWNER", ...ACCOUNT_ROLES].map((item) => <option key={item}>{item}</option>)}</select></label>
       <label>Status<select name="status" defaultValue={statusFilter}><option value="">Semua status</option><option value="ACTIVE">Aktif</option><option value="INACTIVE">Nonaktif</option></select></label>
-      <button className="button-secondary">Terapkan</button>
+      <button className={primaryAction.secondary} type="submit">Terapkan</button>
     </form>
     {error ? <section className={`surface-card ${styles.state}`} role="alert"><strong>Daftar akun belum dapat dimuat.</strong><span>Periksa migration akses akun lalu muat ulang halaman.</span></section>
       : rows.length === 0 ? <section className={`surface-card ${styles.state}`}><strong>{total === 0 ? "Belum ada akun yang cocok." : "Tidak ada akun pada halaman ini."}</strong><span>Ubah pencarian atau filter untuk melihat pengguna.</span></section>

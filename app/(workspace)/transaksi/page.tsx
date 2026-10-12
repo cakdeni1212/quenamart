@@ -45,7 +45,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   return <main className={`page-content ${styles.page}`}>
     <header className={styles.heading}>
       <div><div className="eyebrow">TRANSAKSI PENJUALAN</div><h1>Transaksi</h1><p>Riwayat dan pengelolaan transaksi penjualan.</p></div>
-      <Link className={primaryAction.action} href="/kasir">+ Transaksi Baru</Link>
+      <Link className={primaryAction.primary} href="/kasir">+ Transaksi Baru</Link>
     </header>
 
     {data && <section className={styles.summary} aria-label="Ringkasan periode filter">
