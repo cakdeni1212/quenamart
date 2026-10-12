@@ -1,3 +1,6 @@
+import { salesDateTime, salesMoney, salesPaymentLabel, salesQuantity } from "@/lib/sales/presentation";
+import { Fragment } from "react";
+
 type ReceiptItem = {
   name?: unknown;
   sku?: unknown;
@@ -27,42 +30,30 @@ export type PosReceiptData = {
   payments: ReceiptPayment[];
 };
 
-const money = (value: unknown) => new Intl.NumberFormat("id-ID", {
-  style: "currency", currency: "IDR", maximumFractionDigits: 2,
-}).format(Number(value ?? 0));
-
-const quantity = (value: unknown) => new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 3,
-}).format(Number(value ?? 0));
-
-const methods: Record<string, string> = {
-  CASH: "Tunai", QRIS: "QRIS", CARD: "Kartu", E_WALLET: "E-Wallet",
-};
-
 export function PosReceipt({ receipt, size }: { receipt: PosReceiptData; size: "58" | "80" }) {
-  const payment = receipt.payments[0];
-  const isCash = payment?.method === "CASH";
   return <article className={`pos-receipt pos-receipt-${size}`} data-print-receipt>
     <header className="pos-receipt-brand"><strong>QUENA MART</strong><small>Belanja kebutuhan harian</small></header>
     <div className="pos-receipt-rule" />
     <dl className="pos-receipt-meta">
       <div><dt>No</dt><dd>{receipt.sale_number}</dd></div>
-      <div><dt>Tanggal</dt><dd>{new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "short" }).format(new Date(receipt.completed_at))}</dd></div>
+      <div><dt>Tanggal</dt><dd>{salesDateTime(receipt.completed_at)}</dd></div>
       <div><dt>Kasir</dt><dd>{receipt.cashier_label}</dd></div>
     </dl>
     <div className="pos-receipt-rule" />
     <div className="pos-receipt-items">{receipt.items.map((item, index) => <section className="pos-receipt-item" key={`${String(item.sku ?? "item")}-${index}`}>
       <strong>{String(item.name ?? "Barang")}</strong>
-      <div><span>{quantity(item.quantity)}{item.unit ? ` ${String(item.unit)}` : ""} × {money(item.unit_selling_price)}</span><b>{money(item.line_subtotal)}</b></div>
+      <div><span>{salesQuantity(item.quantity)}{item.unit ? ` ${String(item.unit)}` : ""} × {salesMoney(item.unit_selling_price)}</span><b>{salesMoney(item.line_subtotal)}</b></div>
     </section>)}</div>
     <div className="pos-receipt-rule" />
-    <div className="pos-receipt-total"><span>TOTAL</span><strong>{money(receipt.grand_total)}</strong></div>
-    {payment && <div className="pos-receipt-payment">
-      <div><span>{methods[String(payment.method)] ?? "Pembayaran"}</span><b>{money(payment.applied_amount)}</b></div>
-      {isCash && <>
-        <div><span>Diterima</span><b>{money(payment.received_amount)}</b></div>
-        <div><span>Kembali</span><b>{money(payment.change_amount)}</b></div>
-      </>}
+    <div className="pos-receipt-total"><span>TOTAL</span><strong>{salesMoney(receipt.grand_total)}</strong></div>
+    {receipt.payments.length > 0 && <div className="pos-receipt-payment">
+      {receipt.payments.map((payment, index) => <div key={`${String(payment.method)}-${index}`}>
+        <span>{salesPaymentLabel(payment.method)}</span><b>{salesMoney(payment.applied_amount)}</b>
+      </div>)}
+      {receipt.payments.filter((payment) => payment.method === "CASH").map((payment, index) => <Fragment key={`cash-${index}`}>
+        <div><span>Diterima</span><b>{salesMoney(payment.received_amount)}</b></div>
+        <div><span>Kembali</span><b>{salesMoney(payment.change_amount)}</b></div>
+      </Fragment>)}
     </div>}
     <div className="pos-receipt-rule" />
     <footer>Terima kasih<br />Belanja hemat di Quena Mart</footer>

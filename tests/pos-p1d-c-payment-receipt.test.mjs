@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const ui = await readFile(new URL("../src/components/pos/pos-workspace.tsx", import.meta.url), "utf8");
 const actions = await readFile(new URL("../src/app/actions/pos-cart.ts", import.meta.url), "utf8");
 const receipt = await readFile(new URL("../src/components/pos/pos-receipt.tsx", import.meta.url), "utf8");
+const presentation = await readFile(new URL("../src/lib/sales/presentation.ts", import.meta.url), "utf8");
 const migration = await readFile(new URL("../supabase/migrations/20260929360000_pos_receipt_read_v1.sql", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
@@ -70,9 +71,11 @@ test("receipt RPC is authenticated, outlet-bounded, cashier-owned for KASIR, and
 
 test("receipt renders commercial snapshots, decimal quantities, and cash-only tender facts", () => {
   for (const phrase of ["QUENA MART", "sale_number", "cashier_label", "line_subtotal", "Kembali", "Terima kasih"]) assert.ok(receipt.includes(phrase));
-  assert.match(receipt, /maximumFractionDigits: 3/);
+  assert.match(presentation, /maximumFractionDigits: 3/);
+  assert.match(presentation, /formatRupiah/);
   assert.match(css, /\.pos-receipt-item>strong\{display:block;overflow-wrap:anywhere/);
-  assert.match(receipt, /isCash &&/);
+  assert.match(receipt, /payment\.method === "CASH"/);
+  assert.match(receipt, /receipt\.payments\.map/);
   assert.doesNotMatch(receipt, /hpp|wac|cogs|margin|profit|inventory value|source.layer/i);
 });
 

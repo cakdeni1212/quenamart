@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-12 — Native POS sales transaction history
+
+- Added a read-only `/transaksi` history for completed native POS sales, with Jakarta-local date ranges, sale-number and payment-method filters, filtered summaries, stable 20-row pagination, responsive transaction cards, and immutable sale detail.
+- Added bounded authenticated history RPC `pos_sales_history_read` in migration `20260929400000_pos_sales_history_read_v1.sql`. OWNER/ADMIN see the active outlet; KASIR sees their own completed sales. The response contains no costing or profit data. The same forward migration makes the reused receipt read reject missing/inactive roles explicitly.
+- Reprint reuses the P1D-C receipt reader, component, and 58 mm / 80 mm browser-print layout; split tenders are represented separately. `/kasir` remains the only transaction-creation flow.
+
 ## 2026-10-12 — Global Rupiah input and native reference HPP
 
 - Added one controlled Rupiah input/parser for editable money fields across product creation, product corrections, opening HPP decisions, purchasing/nota/payment forms, and POS cash tender. The UI groups Indonesian thousands while application state keeps canonical decimal strings.
