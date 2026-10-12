@@ -2,8 +2,9 @@
 \timing on
 DO $guard$
 BEGIN
-  IF current_database()<>'quena_stock_staging'
-    OR coalesce(host(inet_server_addr()),'') NOT IN ('127.0.0.1','::1') OR inet_server_port()<>5432
+  IF NOT ((current_database()='quena_stock_staging' AND inet_server_port()=5432)
+      OR (current_database() LIKE 'quena_native_product_%' AND inet_server_port()=55432))
+    OR coalesce(host(inet_server_addr()),'') NOT IN ('127.0.0.1','::1')
     OR current_setting('server_version_num')::integer/10000<>15 OR current_setting('server_encoding')<>'UTF8'
     OR NOT EXISTS(SELECT 1 FROM quena_staging.environment WHERE name='quena_stock_staging')
     OR NOT EXISTS(SELECT 1 FROM quena_staging.applied_migrations WHERE version='20260929290000') THEN
@@ -42,6 +43,9 @@ VALUES(:'product_a'::uuid,:'outlet_id'::uuid,'hpp','SUDAH_DIVERIFIKASI',:'source
 SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001',true);
 SET LOCAL ROLE authenticated;
 SELECT public.purchase_supplier_upsert(NULL,'C3A Staging Supplier',NULL,NULL,NULL,true) supplier_id \gset
+SELECT (public.native_product_create(gen_random_uuid(),'NATIVE-RECEIPT-STAGING',
+  'Native receipt staging product','Native','pcs',NULL,NULL,NULL,7500)->>'product_id')::uuid native_product \gset
+SELECT set_config('quena.c3a.native_product',:'native_product',true);
 RESET ROLE;
 
 -- Reference-only receipt is physical-only and is included in a later explicit bootstrap quantity.
@@ -154,6 +158,48 @@ SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001'
 UPDATE public.inventory_costing_outlet_authority SET status='WAC_ACTIVE',
   activated_by='a0000000-0000-4000-8000-000000000001',activated_at=now()
 WHERE outlet_id=:'outlet_id'::uuid;
+
+-- A native zero projection must be accepted by the unchanged Goods In stock
+-- and acquisition-costing writers after bootstrap/WAC activation.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000003',true);
+SELECT public.purchase_receipt_create_draft(:'outlet_id'::uuid,:'supplier_id'::uuid,now(),
+  'Native zero baseline receipt') native_receipt \gset
+SELECT public.purchase_receipt_save_draft(:'native_receipt'::uuid,1,now(),NULL,jsonb_build_array(
+  jsonb_build_object('product_id',:'native_product','accepted_quantity',10,'bonus_quantity',0,'rejected_quantity',0))) native_save \gset
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000002',true);
+SET LOCAL ROLE authenticated;
+SELECT public.purchase_receipt_acquisition_estimate_save(:'native_receipt'::uuid,
+  (SELECT id FROM public.purchase_receipt_items WHERE receipt_id=:'native_receipt'::uuid),2,0,
+  'MANAGER_ESTIMATE',5000,NULL,'Native post-bootstrap receipt fixture') native_estimate \gset
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000003',true);
+SELECT public.issue_purchase_receipt_post_intent(:'native_receipt'::uuid) native_request \gset
+SELECT public.apply_purchase_receipt_post_intent(:'native_request'::uuid) native_post \gset
+RESET ROLE;
+SELECT set_config('quena.c3a.native_receipt',:'native_receipt',true);
+DO $native_receipt_assertion$
+DECLARE v_stock numeric; v_cost public.inventory_cost_projections%rowtype; v_event public.inventory_cost_events%rowtype;
+BEGIN
+  SELECT effective_quantity INTO v_stock FROM public.stock_balance_projection
+    WHERE outlet_id=current_setting('quena.c3a.outlet')::uuid
+      AND product_id=current_setting('quena.c3a.native_product')::uuid;
+  SELECT * INTO v_cost FROM public.inventory_cost_projections
+    WHERE outlet_id=current_setting('quena.c3a.outlet')::uuid
+      AND product_id=current_setting('quena.c3a.native_product')::uuid;
+  SELECT * INTO v_event FROM public.inventory_cost_events
+    WHERE receipt_id=current_setting('quena.c3a.native_receipt')::uuid;
+  IF v_stock<>10 OR v_cost.physical_quantity<>10 OR v_cost.valued_quantity<>10
+    OR v_cost.provisional_quantity<>10 OR v_cost.inventory_value<>50000 OR v_cost.current_wac<>5000
+    OR v_cost.valuation_status<>'PROVISIONAL' OR v_event.valuation_basis<>'MANAGER_ESTIMATE'
+    OR NOT EXISTS(SELECT 1 FROM public.stock_movements m
+      WHERE m.product_id=current_setting('quena.c3a.native_product')::uuid
+        AND m.movement_type='PURCHASE_RECEIPT' AND m.quantity_delta=10) THEN
+    RAISE EXCEPTION 'NATIVE_ZERO_BASELINE_PURCHASE_RECEIPT_OR_PROVISIONAL_COSTING_FAILED';
+  END IF;
+END $native_receipt_assertion$;
 
 -- The same request now posts once: 10 paid + 2 bonus at Rp10,000 values 12 units at Rp100,000.
 SET LOCAL ROLE authenticated;

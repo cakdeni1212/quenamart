@@ -5,9 +5,9 @@
 -- database name, and the installed candidate migration before invoking this.
 DO $guard$
 BEGIN
-  IF current_database()<>'quena_stock_cutover_clean'
+  IF NOT ((current_database()='quena_stock_cutover_clean' AND inet_server_port()=55439)
+      OR (current_database() LIKE 'quena_native_product_%' AND inet_server_port()=55432))
     OR coalesce(host(inet_server_addr()),'') NOT IN ('127.0.0.1','::1')
-    OR inet_server_port()<>55439
     OR current_setting('server_version_num')::integer/10000<>15
     OR to_regprocedure('public.stock_opening_cutover(uuid,uuid,uuid,uuid,text)') IS NULL
     OR NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='stock_opening_cutover_request_one_per_outlet') THEN
@@ -17,16 +17,16 @@ END $guard$;
 
 -- A clean staging database has one pre-created outlet from the stock fixture
 -- bootstrap. Auth/profile and import records below are disposable test data.
-INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES
- ('a0000000-0000-4000-8000-000000000001','owner@local.test','{}'),
- ('a0000000-0000-4000-8000-000000000002','cashier@local.test','{}');
+INSERT INTO auth.users(id) VALUES
+ ('a0000000-0000-4000-8000-000000000001'),
+ ('a0000000-0000-4000-8000-000000000002')
+ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.profiles(id,full_name,role,is_active) VALUES
- ('a0000000-0000-4000-8000-000000000001','Cutover Owner','OWNER',true),
- ('a0000000-0000-4000-8000-000000000002','Cutover Cashier','KASIR',true);
+ ('a0000000-0000-4000-8000-000000000001','Cutover Owner','OWNER',true)
+ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name,role=EXCLUDED.role,is_active=EXCLUDED.is_active;
 
 SELECT id AS outlet_id FROM public.outlets WHERE code='QUENA-MART-1' AND is_active \gset
 SELECT 'a0000000-0000-4000-8000-000000000001'::uuid AS owner_id \gset
-SELECT gen_random_uuid() AS previous_period \gset
 SELECT gen_random_uuid() AS previous_request \gset
 SELECT gen_random_uuid() AS previous_import_request \gset
 SELECT gen_random_uuid() AS previous_batch \gset
@@ -37,9 +37,20 @@ SELECT gen_random_uuid() AS final_commit \gset
 SELECT gen_random_uuid() AS stock_operation_request \gset
 SELECT gen_random_uuid() AS movement_batch \gset
 
-INSERT INTO public.stock_authority_periods(id,outlet_id,mode,created_by,created_reason)
-VALUES(:'previous_period'::uuid,:'outlet_id'::uuid,'IPOS_SNAPSHOT_PLUS_QUENA_MOVEMENTS',
-  :'owner_id'::uuid,'Disposable rehearsal period');
+SELECT id AS previous_period FROM public.stock_authority_periods
+ WHERE outlet_id=:'outlet_id'::uuid AND ended_at IS NULL \gset
+UPDATE public.stock_authority_periods SET mode='IPOS_SNAPSHOT_PLUS_QUENA_MOVEMENTS',
+  created_by=:'owner_id'::uuid,created_reason='Disposable rehearsal period'
+WHERE id=:'previous_period'::uuid;
+
+-- Mix a real native zero baseline into this iPos cutover fixture. It must not
+-- need a normalization row or appear in cutover item/source evidence.
+SELECT set_config('request.jwt.claim.sub', :'owner_id', false);
+SET ROLE authenticated;
+SELECT (public.native_product_create(gen_random_uuid(),'CUTOVER-NATIVE-ZERO','Native zero baseline cutover fixture',
+  'Native','pcs',NULL,NULL,NULL,9000)->>'product_id')::uuid AS native_product_id \gset
+RESET ROLE;
+SELECT set_config('quena.native_product', :'native_product_id', false);
 
 INSERT INTO public.ipos_import_requests(id,outlet_id,requested_by,storage_path,state,original_filename)
 VALUES(:'previous_import_request'::uuid,:'outlet_id'::uuid,:'owner_id'::uuid,
@@ -96,6 +107,16 @@ INSERT INTO public.ipos_import_rows(id,batch_id,outlet_id,source_row_number,raw_
 SELECT gen_random_uuid(),:'final_batch'::uuid,:'outlet_id'::uuid,2+n,
   jsonb_build_object('sku',sku,'STOK',opening_qty::text),'VALID',product_id,'[]'
 FROM cutover_fixture_products ORDER BY n;
+CREATE TEMP TABLE other_stock_products ON COMMIT PRESERVE ROWS AS
+SELECT p.product_id,pr.sku,row_number() OVER(ORDER BY p.product_id)::integer AS n
+FROM public.stock_balance_projection p JOIN public.products pr ON pr.id=p.product_id
+WHERE p.outlet_id=:'outlet_id'::uuid
+  AND p.native_zero_baseline_request_id IS NULL
+  AND NOT EXISTS(SELECT 1 FROM cutover_fixture_products f WHERE f.product_id=p.product_id);
+INSERT INTO public.ipos_import_rows(id,batch_id,outlet_id,source_row_number,raw_data,status,product_id,validation_errors)
+SELECT gen_random_uuid(),:'final_batch'::uuid,:'outlet_id'::uuid,100+n,
+  jsonb_build_object('sku',sku,'STOK','0'),'VALID',product_id,'[]'
+FROM other_stock_products ORDER BY n;
 CREATE TEMP TABLE final_sources AS
 SELECT r.product_id,r.id AS row_id FROM public.ipos_import_rows r
 WHERE r.batch_id=:'final_batch'::uuid;
@@ -111,6 +132,11 @@ INSERT INTO public.ipos_normalization_commit_rows(commit_id,batch_id,outlet_id,s
 SELECT :'final_commit'::uuid,:'final_batch'::uuid,:'outlet_id'::uuid,s.row_id,2+p.n,'UPDATE',p.sku,
   p.product_id,p.product_id,jsonb_build_object('quantity',p.opening_qty),'{}','[]','{}'
 FROM cutover_fixture_products p JOIN final_sources s USING(product_id) ORDER BY p.n;
+INSERT INTO public.ipos_normalization_commit_rows(commit_id,batch_id,outlet_id,source_row_id,
+  source_row_number,action,sku,expected_product_id,product_id,normalized_data,finding_codes,validation_errors,override_conflicts)
+SELECT :'final_commit'::uuid,:'final_batch'::uuid,:'outlet_id'::uuid,s.row_id,99+p.n,'UPDATE',p.sku,
+  p.product_id,p.product_id,jsonb_build_object('quantity',0),'{}','[]','{}'
+FROM other_stock_products p JOIN final_sources s USING(product_id) ORDER BY p.n;
 
 INSERT INTO public.stock_balance_projection(product_id,outlet_id,authority_period_id,baseline_quantity,
   baseline_source_import_row_id,baseline_batch_id,baseline_commit_id,unreconciled_movement_delta,
@@ -340,8 +366,8 @@ BEGIN
   v_outlet:=(v_result->>'outletId')::uuid;
   v_previous:=(v_result->>'previousAuthorityPeriodId')::uuid;
   v_new:=(v_result->>'newAuthorityPeriodId')::uuid;
-  IF (SELECT count(*) FROM public.stock_opening_cutover_items WHERE request_id=v_request)<>3 THEN
-    RAISE EXCEPTION 'Expected three immutable opening line records';
+  IF (SELECT count(*) FROM public.stock_opening_cutover_items WHERE request_id=v_request)<3 THEN
+    RAISE EXCEPTION 'Expected immutable opening line records for imported products';
   END IF;
   IF (SELECT count(*) FROM public.stock_movements m JOIN cutover_fixture_products f USING(product_id)
       WHERE m.authority_period_id=v_previous)<>3 THEN
@@ -364,8 +390,27 @@ BEGIN
       AND ended_at IS NULL AND mode='QUENA_MOVEMENT_LEDGER') THEN
     RAISE EXCEPTION 'Old/new period cutover state is invalid';
   END IF;
-  IF (SELECT count(*) FROM public.stock_balance_projection_events WHERE opening_cutover_request_id=v_request)<>3 THEN
-    RAISE EXCEPTION 'Expected one accepted baseline event per product';
+  IF (SELECT count(*) FROM public.stock_balance_projection_events WHERE opening_cutover_request_id=v_request)
+       < (SELECT count(*) FROM public.stock_opening_cutover_items WHERE request_id=v_request)+1
+    OR (SELECT count(*) FROM public.stock_opening_cutover_items WHERE request_id=v_request)
+       <> (SELECT count(*) FROM public.stock_balance_projection WHERE outlet_id=v_outlet)-1 THEN
+    RAISE EXCEPTION 'Expected one iPos opening item per imported projection and a native period-advance event';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.stock_balance_projection p
+      JOIN public.stock_native_zero_baselines b ON b.request_id=p.native_zero_baseline_request_id
+        AND b.product_id=p.product_id AND b.outlet_id=p.outlet_id
+      WHERE p.product_id=current_setting('quena.native_product')::uuid AND p.outlet_id=v_outlet
+        AND p.authority_period_id=v_new AND p.baseline_quantity=0
+        AND p.unreconciled_movement_delta=0 AND p.effective_quantity=0
+        AND p.baseline_source_import_row_id IS NULL AND p.baseline_batch_id IS NULL
+        AND p.baseline_commit_id IS NULL AND b.source_system='QUENA_NATIVE'
+        AND b.accepted_baseline_quantity=0)
+    OR EXISTS(SELECT 1 FROM public.stock_opening_cutover_items i
+      WHERE i.request_id=v_request AND i.product_id=current_setting('quena.native_product')::uuid)
+    OR EXISTS(SELECT 1 FROM public.ipos_normalization_commit_rows cr
+      WHERE cr.commit_id=(SELECT normalization_commit_id FROM public.stock_opening_cutover_requests
+        WHERE request_id=v_request) AND cr.product_id=current_setting('quena.native_product')::uuid) THEN
+    RAISE EXCEPTION 'Native zero baseline was altered, deleted, or given iPos provenance during cutover';
   END IF;
 END $success_assertions$;
 
