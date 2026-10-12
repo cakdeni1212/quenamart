@@ -57,6 +57,8 @@ test('current outlet selling price writes through the existing history trigger',
   assert.match(action, /p_reference_hpp: hpp/);
   assert.match(form, /HPP \/ Harga Pokok/);
   assert.match(form, /Harga jual lebih rendah dari HPP/);
+  assert.match(form, /import \{ compareRupiah \} from "@\/lib\/money"/);
+  assert.match(form, /compareRupiah\(sellingPrice, hpp\) === -1/);
   assert.match(action, /NATIVE_PRODUCT_SKU_EXISTS: "Kode SKU sudah digunakan\."/);
   assert.match(action, /NATIVE_PRODUCT_BARCODE_EXISTS: "Barcode sudah digunakan oleh produk lain\."/);
 });

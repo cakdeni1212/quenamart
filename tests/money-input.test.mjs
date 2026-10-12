@@ -14,6 +14,9 @@ test('canonical Rupiah input groups Indonesian thousands and preserves submitted
   assert.equal(parseRupiahInput('Rp 120.000'), '120000');
   assert.equal(parseRupiahInput('1.250.000'), '1250000');
   assert.equal(parseRupiahInput('Rp 1.250.000'), '1250000');
+  assert.equal(compareRupiah('120.000', '95.000'), 1);
+  assert.equal(compareRupiah('95.000', '120.000'), -1);
+  assert.equal(compareRupiah('120.000', '120.000'), 0);
 });
 
 test('empty, replacement, paste, deletion, and exact two-decimal values remain safe', () => {
