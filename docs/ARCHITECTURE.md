@@ -78,6 +78,14 @@ Checkpoint A adds a separate, locally implemented (not production-deployed) one-
 - Use the anon/publishable key with the user's session for normal application operations.
 - Do not place a service role key in client code or use it to bypass intended RLS.
 - Add server-side role checks to every server action and route handler. Treat client input and hidden UI as untrusted.
+
+## Identity and account access
+
+Quena Mart identity is shared across Web/PWA and future Android clients: Supabase Auth user UUID → `public.profiles` row with the same UUID → operational role → server/database authorization and the existing active outlet context. Android must authenticate the same Supabase Auth identity; it does not get a parallel employee or role store. The current schema has no per-user outlet-membership table and operates with the existing single active outlet context; explicit outlet assignments are a prerequisite for a future multi-outlet access UI.
+
+`/pengaturan/akun` is OWNER-only. Account invitations use the server-only Supabase Auth Admin client and Supabase's email invitation/password-setup flow. The project must have Auth email delivery configured and allow the application `/auth/confirm` redirect; a failed Auth invitation is reported as failure rather than a successful invitation. The confirmation page handles Supabase's default session-fragment redirect and a custom `token_hash` link. Profile insertion and employee-role assignment run through OWNER-checked database functions. Invitation state stores no password, token, or session secret. Auth and Postgres cannot share one transaction, so the server compensates by removing a newly invited Auth identity if profile creation is confirmed to have rolled back; ambiguous outcomes are checked against the durable request record before any compensation.
+
+Accounts are deactivated through `profiles.is_active`; profiles and Auth identities are never deleted from account management. Inactive profiles are denied by the existing server profile loader and `current_active_user_role()` while UUID actor references and immutable sale/cashier snapshots remain intact. `auth.users.last_sign_in_at` is the displayed access timestamp; missing values display “Belum tersedia” and are never inferred from profile updates. Normal account management can create ADMIN/KASIR/GUDANG only; OWNER changes require a separate elevated process. The actor UUID remains the stable identity in operational evidence even when a display name changes.
 - Enforce data boundaries with Supabase RLS as the final database control. The app's role matrix is a UX and server foundation, not a replacement for RLS.
 - Sensitive HPP, capital, profit, and other financial fields need explicit role grants and database policies. The deployed product schema grants HPP access to OWNER and ADMIN only; other financial modules remain undecided.
 

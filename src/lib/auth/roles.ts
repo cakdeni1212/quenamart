@@ -22,6 +22,7 @@ export type AppSection =
   | "member"
   | "laporan"
   | "pengaturan"
+  | "akun"
   | "import-ipos";
 
 const sectionAccess: Record<AppSection, readonly UserRole[]> = {
@@ -37,6 +38,7 @@ const sectionAccess: Record<AppSection, readonly UserRole[]> = {
   member: ["OWNER", "ADMIN", "KASIR"],
   laporan: ["OWNER", "ADMIN"],
   pengaturan: ["OWNER", "ADMIN"],
+  akun: ["OWNER"],
   "import-ipos": ["OWNER", "ADMIN", "GUDANG"],
 };
 

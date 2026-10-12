@@ -49,6 +49,9 @@ export function Sidebar({ role, name }: { role: UserRole; name: string | null })
                 return <Link key={link.href} href={link.href} className={`nav-item nav-subitem${current ? " nav-active" : ""}`} aria-current={current ? "page" : undefined}>{link.label}</Link>;
               })}
             </div>}
+            {item.label === "Pengaturan" && canAccessSection(role, "akun") && <div className="nav-sublist" aria-label="Menu Pengaturan">
+              <Link href="/pengaturan/akun" className={`nav-item nav-subitem${pathname.startsWith("/pengaturan/akun") ? " nav-active" : ""}`} aria-current={pathname.startsWith("/pengaturan/akun") ? "page" : undefined}>Akun &amp; Akses</Link>
+            </div>}
           </div>;
         })}
       </nav>

@@ -25,6 +25,8 @@ Quena Mart is a Next.js 16.3.6 App Router application using TypeScript, Tailwind
 - [Changelog](CHANGELOG.md): shipped changes.
 - [TODO](TODO.md): next work and open decisions.
 
+Identity remains shared across Web/PWA and future Android apps: the same Supabase Auth user UUID resolves to the same `public.profiles` role and the existing server/database outlet authorization. OWNER manages employee invitations and active status at `/pengaturan/akun`; inactive profiles remain as historical actors and cannot use Quena Mart workspaces. See [Architecture](ARCHITECTURE.md#identity-and-account-access) for the invitation, retention, and future outlet-membership boundary.
+
 ## iPos import requirements
 
 Future import must accept raw XLSX exports from iPos. The current source dataset contains 5,103 SKUs. Preserve the original workbook/source rows and values; do not overwrite them with normalized or corrected data. Automated audit flags can overlap for a single SKU. Provide a future correction workflow and export without losing source values or audit history.
