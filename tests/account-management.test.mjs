@@ -13,6 +13,7 @@ const confirmClient = read("../src/components/auth/invite-confirmation.tsx");
 const passwordAction = read("../src/app/actions/account-password.ts");
 const workspace = read("../src/components/accounts/account-management-workspace.tsx");
 const architecture = read("../docs/ARCHITECTURE.md");
+const primaryActionStyles = read("../src/components/ui/workspace-primary-action.module.css");
 const model = await import("../src/lib/accounts/model.ts");
 
 test("account workspace and every data contract are OWNER-only", () => {
@@ -109,4 +110,15 @@ test("account input normalizes email and validates supported human roles", () =>
   assert.match(model.accountDateTime("not a date"), /Belum tersedia/);
   assert.equal(model.accountErrorMessage("ACCOUNT_UNAUTHORIZED"), "Anda tidak memiliki izin mengelola akun.");
   assert.doesNotMatch(model.accountErrorMessage("SQLSTATE 42501 raw detail"), /SQLSTATE|DETAIL|42501/);
+});
+
+test("workspace create actions share the canonical primary action style", () => {
+  assert.match(workspace, /primaryAction\.action} type="button" onClick=\{show\}>\+ Tambah Akun/);
+  assert.match(primaryActionStyles, /min-height: 39px/);
+  assert.match(primaryActionStyles, /background: #316447/);
+  assert.match(primaryActionStyles, /:hover/);
+  assert.match(primaryActionStyles, /:focus-visible/);
+  assert.match(primaryActionStyles, /:disabled/);
+  assert.match(read("../app/(workspace)/produk/page.tsx"), /primaryAction\.action/);
+  assert.match(read("../app/(workspace)/transaksi/page.tsx"), /primaryAction\.action/);
 });

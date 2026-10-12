@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createManagedAccount, updateManagedAccount, type AccountActionResult } from "@/app/actions/account-management";
 import { ACCOUNT_ROLE_DESCRIPTIONS, ACCOUNT_ROLES, accountDateTime } from "@/lib/accounts/model";
 import type { ManagedAccount } from "@/lib/accounts/read";
+import primaryAction from "@/components/ui/workspace-primary-action.module.css";
 import styles from "./accounts.module.css";
 
 const roleLabels = { OWNER: "OWNER", ADMIN: "ADMIN", KASIR: "KASIR", GUDANG: "GUDANG" } as const;
@@ -39,7 +40,7 @@ export function CreateAccountButton() {
   }
 
   return <>
-    <button className="button-primary" type="button" onClick={show}>＋ Tambah Akun</button>
+    <button className={primaryAction.action} type="button" onClick={show}>+ Tambah Akun</button>
     {open && <div className={styles.backdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="account-create-title">
         <div className={styles.dialogHead}><div><span className="eyebrow">UNDANG ANGGOTA TIM</span><h2 id="account-create-title">Tambah Akun</h2></div><button type="button" className={styles.close} onClick={() => setOpen(false)} disabled={busy} aria-label="Tutup">×</button></div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/session";
 import { canAccessSection } from "@/lib/auth/roles";
+import primaryAction from "@/components/ui/workspace-primary-action.module.css";
 import { createClient } from "@/lib/supabase/server";
 
 const issues: Record<string, string> = {
@@ -40,7 +41,7 @@ export default async function ProdukPage({ searchParams }: { searchParams: Promi
   for (const [key, value] of Object.entries(params)) if (key !== "page" && value) query.set(key, value);
   const hrefForPage = (n: number) => `/produk?${new URLSearchParams([...query.entries(), ["page", String(n)]]).toString()}`;
   return <main className="page-content">
-    <div className="eyebrow">KATALOG & INVENTARIS</div><div className="page-heading"><div><h1>Produk</h1><p>Produk dari snapshot iPos dan produk native Quena Mart.</p></div><div className="product-heading-actions">{isManager && <Link className="native-product-add" href="/produk/tambah">+ Tambah Produk</Link>}<Link className="quiet-button" href="/audit-produk">Ringkasan Audit →</Link></div></div>
+    <div className="eyebrow">KATALOG & INVENTARIS</div><div className="page-heading"><div><h1>Produk</h1><p>Produk dari snapshot iPos dan produk native Quena Mart.</p></div><div className="product-heading-actions">{isManager && <Link className={primaryAction.action} href="/produk/tambah">+ Tambah Produk</Link>}<Link className="quiet-button" href="/audit-produk">Ringkasan Audit →</Link></div></div>
     <form className="product-filters" action="/produk" method="get">
       <input name="q" defaultValue={params.q} placeholder="Cari nama, SKU, atau barcode" aria-label="Cari produk" />
       <input name="category" defaultValue={params.category} placeholder="Kategori (tepat)" aria-label="Filter kategori" />

@@ -6,6 +6,7 @@ import { salesDateTime, salesMoney, salesPaymentLabel } from "@/lib/sales/presen
 import { requireProfile } from "@/lib/auth/session";
 import { canAccessSection } from "@/lib/auth/roles";
 import styles from "@/components/sales/sales-history.module.css";
+import primaryAction from "@/components/ui/workspace-primary-action.module.css";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const METHODS = ["CASH", "QRIS", "CARD", "E_WALLET"] as const;
@@ -44,7 +45,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   return <main className={`page-content ${styles.page}`}>
     <header className={styles.heading}>
       <div><div className="eyebrow">TRANSAKSI PENJUALAN</div><h1>Transaksi</h1><p>Riwayat dan pengelolaan transaksi penjualan.</p></div>
-      <Link className={styles.primary} href="/kasir">+ Transaksi Baru</Link>
+      <Link className={primaryAction.action} href="/kasir">+ Transaksi Baru</Link>
     </header>
 
     {data && <section className={styles.summary} aria-label="Ringkasan periode filter">
