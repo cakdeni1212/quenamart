@@ -46,7 +46,7 @@ test("receipt product row is the shared editable purchase line and invoice embed
 });
 
 test("purchase unit price stays editable and subtotal rounds to invoice cent semantics", () => {
-  assert.match(receiptEditor, /type="number" min="0" step="0\.01" value=\{line\.unitPrice\}/);
+  assert.match(receiptEditor, /Harga beli<RupiahInput value=\{line\.unitPrice\} onValueChange=\{\(price\) =>/);
   assert.match(receiptEditor, /priceSource: null/);
   assert.equal(receiptInvoiceSubtotal("5", "13000"), 65000);
   assert.equal(receiptInvoiceSubtotal("1.125", "100.01"), 112.51);

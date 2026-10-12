@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { parseRupiahInput } from "@/lib/money";
 
 export type NativeProductFormState = {
   error?: string;
@@ -20,6 +21,7 @@ const messages: Record<string, string> = {
   NATIVE_PRODUCT_BARCODE_INVALID: "Barcode tidak valid.",
   NATIVE_PRODUCT_BARCODE_EXISTS: "Barcode sudah digunakan oleh produk lain.",
   NATIVE_PRODUCT_PRICE_INVALID: "Harga jual harus lebih besar dari Rp0 dan maksimal 2 angka desimal.",
+  NATIVE_PRODUCT_HPP_INVALID: "HPP / Harga Pokok wajib diisi dan maksimal 2 angka desimal.",
   NATIVE_PRODUCT_REQUEST_CONFLICT: "Permintaan ini sudah digunakan dengan data berbeda. Muat ulang formulir.",
 };
 
@@ -37,6 +39,11 @@ function containsControl(value: string) {
   return /[\u0000-\u001f\u007f-\u009f]/u.test(value);
 }
 
+function cents(value: string) {
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * BigInt("100") + BigInt(fraction.padEnd(2, "0"));
+}
+
 export async function createNativeProduct(
   _previous: NativeProductFormState,
   formData: FormData,
@@ -52,7 +59,7 @@ export async function createNativeProduct(
     return { error: "SKU atau barcode mengandung karakter yang tidak didukung." };
   }
   const values = Object.fromEntries(
-    ["sku", "name", "category", "unit", "brand", "rack", "barcode", "sellingPrice", "autoSku"].map((key) => [key, text(formData, key)]),
+    ["sku", "name", "category", "unit", "brand", "rack", "barcode", "hpp", "sellingPrice", "autoSku"].map((key) => [key, text(formData, key)]),
   );
   const requestId = text(formData, "requestId");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
@@ -61,12 +68,17 @@ export async function createNativeProduct(
   if (!values.name || !values.category || !values.unit) {
     return { error: "Nama produk, kategori, dan satuan wajib diisi.", values };
   }
-  const rawPrice = values.sellingPrice.replace(/\s/g, "");
-  if (!/^\d+(?:[.,]\d{1,2})?$/.test(rawPrice)) {
+  const hpp = parseRupiahInput(values.hpp);
+  if (hpp === null || hpp === "") {
+    return { error: "HPP / Harga Pokok wajib diisi dengan nilai Rupiah yang valid.", values };
+  }
+  if (cents(hpp) >= BigInt("100000000000000")) return { error: messages.NATIVE_PRODUCT_HPP_INVALID, values };
+  const sellingPrice = parseRupiahInput(values.sellingPrice);
+  if (sellingPrice === null || sellingPrice === "") {
     return { error: "Masukkan harga jual yang valid, maksimal 2 angka desimal.", values };
   }
-  const sellingPrice = rawPrice.replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(sellingPrice) || Number(sellingPrice) <= 0 || Number(sellingPrice) >= 1_000_000_000_000) {
+  const sellingCents = cents(sellingPrice);
+  if (sellingCents <= BigInt("0") || sellingCents >= BigInt("100000000000000")) {
     return { error: "Harga jual harus lebih besar dari Rp0.", values };
   }
 
@@ -80,6 +92,7 @@ export async function createNativeProduct(
     p_brand_label: values.brand || null,
     p_rack_label: values.rack || null,
     p_barcode: values.barcode || null,
+    p_reference_hpp: hpp,
     p_selling_price: sellingPrice,
   });
   if (error) return { error: errorMessage(error.message), values };

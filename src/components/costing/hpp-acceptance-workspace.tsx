@@ -11,6 +11,7 @@ import {
 import type { HppAcceptanceRow, HppAcceptanceWorkspaceData, HppAcceptanceView } from "@/lib/costing/hpp-acceptance-read";
 import { blockerLabels, compareRupiahValues, formatCompactRupiah, formatRupiah, openingHppDisplayValue, visibleHppActionError, warningLabel } from "@/lib/costing/hpp-acceptance-presentation";
 import type { UserRole } from "@/lib/auth/roles";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 
 const VIEW_LABEL: Record<HppAcceptanceView, string> = {
   EXCEPTIONS: "Perlu Ditinjau", CANDIDATES: "Siap", WARNINGS: "Peringatan",
@@ -149,7 +150,7 @@ function ResolutionDialog({ row, batchId, onClose, onSaved }: {
       <fieldset className="hpp-options"><legend>Pilih keputusan</legend>
         {canAcceptCurrent && <label><input type="radio" name="disposition" checked={disposition === "ACCEPT_CURRENT_HPP"} onChange={() => setDisposition("ACCEPT_CURRENT_HPP")} /><span><strong>Gunakan HPP saat ini</strong><small>HPP saat ini memang benar dan akan digunakan sebagai nilai awal.</small></span></label>}
         <label><input type="radio" name="disposition" checked={disposition === "OPENING_HPP_OVERRIDE"} onChange={() => setDisposition("OPENING_HPP_OVERRIDE")} /><span><strong>Masukkan HPP awal</strong><small>Nilai ini hanya digunakan sebagai HPP awal sistem baru dan tidak mengubah riwayat HPP iPos.</small></span></label>
-        {disposition === "OPENING_HPP_OVERRIDE" && <label className="hpp-override-field">HPP awal (Rupiah)<input inputMode="decimal" autoComplete="off" value={openingHpp} onChange={(event) => setOpeningHpp(event.target.value)} placeholder="Contoh: 10000" aria-label="HPP awal dalam Rupiah" /><small>Nilai yang akan disimpan: {formatRupiah(openingHpp)}</small></label>}
+        {disposition === "OPENING_HPP_OVERRIDE" && <label className="hpp-override-field">HPP awal (Rupiah)<RupiahInput value={openingHpp} onValueChange={setOpeningHpp} placeholder="Contoh: 100.000" aria-label="HPP awal dalam Rupiah" /><small>Nilai yang akan disimpan: {formatRupiah(openingHpp)}</small></label>}
         <label><input type="radio" name="disposition" checked={disposition === "LEAVE_UNVALUED"} onChange={() => setDisposition("LEAVE_UNVALUED")} /><span><strong>Biarkan belum dinilai</strong><small>Produk tetap memiliki stok, tetapi nilai modal awal belum ditentukan.</small></span></label>
         {isZeroHpp && <label><input type="radio" name="disposition" checked={disposition === "AUTHORITATIVE_ZERO"} onChange={() => setDisposition("AUTHORITATIVE_ZERO")} /><span><strong>HPP memang Rp0</strong><small>Gunakan Rp0 sebagai nilai awal karena memang benar.</small></span></label>}
       </fieldset>

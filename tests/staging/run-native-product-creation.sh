@@ -54,7 +54,8 @@ for file in \
   20260929350000_pos_atomic_checkout_v1.sql \
   20260929360000_pos_receipt_read_v1.sql \
   20260929370000_stock_opening_cutover_v1.sql \
-  20260929380000_native_product_creation_v1.sql; do
+  20260929380000_native_product_creation_v1.sql \
+  20260929390000_native_product_reference_hpp_v1.sql; do
   psql_db "$DB" -f "$ROOT/supabase/migrations/$file" >"$TMP/$file.log"
   version="${file%%_*}"
   ordinal="$(psql_db "$DB" -Atqc 'SELECT coalesce(max(ordinal),0)+1 FROM quena_staging.applied_migrations')"
@@ -75,7 +76,7 @@ request_a="$(psql_db "$DB" -Atqc 'SELECT gen_random_uuid()')"
 request_b="$(psql_db "$DB" -Atqc 'SELECT gen_random_uuid()')"
 call_sql() {
   local request="$1" name="$2"
-  psql_db "$DB" -Atqc "SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001',false); SELECT public.native_product_create('$request'::uuid,'$sku','$name','Race','pcs',NULL,NULL,NULL,1000)"
+  psql_db "$DB" -Atqc "SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001',false); SELECT public.native_product_create('$request'::uuid,'$sku','$name','Race','pcs',NULL,NULL,NULL,95000,1000)"
 }
 call_sql "$request_a" 'Native race A' >"$TMP/sku-a.log" 2>&1 & pid_a=$!
 call_sql "$request_b" 'Native race B' >"$TMP/sku-b.log" 2>&1 & pid_b=$!
@@ -98,7 +99,7 @@ request_a="$(psql_db "$DB" -Atqc 'SELECT gen_random_uuid()')"
 request_b="$(psql_db "$DB" -Atqc 'SELECT gen_random_uuid()')"
 call_barcode() {
   local request="$1" sku_value="$2" name="$3"
-  psql_db "$DB" -Atqc "SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001',false); SELECT public.native_product_create('$request'::uuid,'$sku_value','$name','Race','pcs',NULL,NULL,'$barcode',1000)"
+  psql_db "$DB" -Atqc "SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001',false); SELECT public.native_product_create('$request'::uuid,'$sku_value','$name','Race','pcs',NULL,NULL,'$barcode',95000,1000)"
 }
 call_barcode "$request_a" "NATIVE-BA-$RUN_TAG" 'Native barcode race A' >"$TMP/barcode-a.log" 2>&1 & pid_a=$!
 call_barcode "$request_b" "NATIVE-BB-$RUN_TAG" 'Native barcode race B' >"$TMP/barcode-b.log" 2>&1 & pid_b=$!
@@ -116,6 +117,6 @@ if [[ $rc_b -ne 0 ]] && ! rg -q 'NATIVE_PRODUCT_BARCODE_EXISTS' "$TMP/barcode-b.
 attached="$(psql_db "$DB" -Atqc "SELECT count(*) FROM public.product_barcodes WHERE barcode='$barcode' AND is_active")"
 [[ "$attached" == 1 ]] || { echo "FAIL: concurrent barcode attached to $attached products" >&2; exit 36; }
 
-echo "PASS: migrations 310000–380000 and native product runtime verified on disposable clone $DB"
+echo "PASS: migrations 310000–390000 and native product runtime verified on disposable clone $DB"
 echo 'PASS: concurrent duplicate SKU and barcode each produced one creation and one friendly conflict'
 echo 'PASS: clone is dropped on exit; no linked Supabase project is contacted'

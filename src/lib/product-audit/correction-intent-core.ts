@@ -1,5 +1,6 @@
 import { canAccessSection, type UserRole } from "../auth/roles.ts";
 import { isUuid } from "./context.ts";
+import { formatRupiahInput, parseRupiahInput } from "../money.ts";
 
 export const CORRECTION_FIELDS = ["barcode", "rack_label", "hpp", "selling_price"] as const;
 export type CorrectionField = (typeof CORRECTION_FIELDS)[number];
@@ -55,35 +56,12 @@ export function forgetCorrectionRequestId(storage: CorrectionIntentStorage, prod
 
 /** Parse Indonesian currency notation exactly as decimal digits before converting for JSON RPC. */
 export function parseIndonesianMoney(input: string): { value: number; canonical: string } | null {
-  const raw = input.trim();
-  if (!raw) return null;
-  let whole: string;
-  let fraction = "";
-  if (raw.includes(",")) {
-    const match = /^(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?$/.exec(raw);
-    if (!match) return null;
-    whole = match[1].replaceAll(".", "");
-    fraction = match[2] ?? "";
-  } else if (raw.includes(".")) {
-    const grouped = /^(\d{1,3}(?:\.\d{3})+)$/.exec(raw);
-    if (grouped) whole = raw.replaceAll(".", "");
-    else {
-      const decimal = /^(\d+)\.(\d{1,2})$/.exec(raw);
-      if (!decimal) return null;
-      whole = decimal[1];
-      fraction = decimal[2];
-    }
-  } else {
-    if (!/^\d+$/.test(raw)) return null;
-    whole = raw;
-  }
-  const integer = BigInt(whole);
-  const cents = integer * BigInt(100) + BigInt((fraction + "00").slice(0, 2));
-  if (cents < BigInt(0) || cents > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-  const canonical = `${integer.toString()}.${(fraction + "00").slice(0, 2)}`;
-  const value = Number(canonical);
-  if (!Number.isFinite(value) || value >= 1_000_000_000_000) return null;
-  return { value, canonical };
+  const canonical = parseRupiahInput(input);
+  if (!canonical) return null;
+  const [whole, fraction = "00"] = canonical.split(".");
+  const cents = BigInt(whole) * BigInt("100") + BigInt(fraction.padEnd(2, "0"));
+  if (cents > BigInt(Number.MAX_SAFE_INTEGER) || BigInt(whole) >= BigInt("1000000000000")) return null;
+  return { value: Number(`${whole}.${fraction}`), canonical: `${whole}.${fraction.padEnd(2, "0")}` };
 }
 
 export function formatIndonesianMoney(value: string | number | null): string {
@@ -98,10 +76,8 @@ export function formatIndonesianMoney(value: string | number | null): string {
 }
 
 export function formatIndonesianMoneyInput(input: string): string {
-  const parsed = parseIndonesianMoney(input);
-  if (!parsed) return input.trim();
-  const [whole, fraction] = parsed.canonical.split(".");
-  return formatIndonesianMoney(`${whole}.${fraction}`);
+  const parsed = parseRupiahInput(input);
+  return parsed ? `Rp ${formatRupiahInput(parsed)}` : input.trim();
 }
 
 export function parseCorrectionIntentRequestId(value: unknown): string | null {

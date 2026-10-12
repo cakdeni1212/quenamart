@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-12 — Global Rupiah input and native reference HPP
+
+- Added one controlled Rupiah input/parser for editable money fields across product creation, product corrections, opening HPP decisions, purchasing/nota/payment forms, and POS cash tender. The UI groups Indonesian thousands while application state keeps canonical decimal strings.
+- Native product creation now requires a product-reference HPP stored through existing `product_costs` and append-only `product_cost_history`; migration `20260929390000_native_product_reference_hpp_v1.sql` does not create stock, acquisition, inventory valuation, costing events, HPP acceptance, bootstrap, or WAC state.
+- Native products continue to start at zero stock. Posted supplier receipts use their own acquisition evidence for valuation, independent of the product reference HPP.
+
 ## 2026-10-11 — Native POS P1D-C payment and receipt UI
 
 - Added cashier payment selection for Tunai, QRIS, Kartu, and E-Wallet using the existing atomic P1D-B checkout RPC. The interface shows cash received/change, blocks obvious client-side readiness issues and duplicate submissions, and presents a completed transaction only after checkout succeeds.

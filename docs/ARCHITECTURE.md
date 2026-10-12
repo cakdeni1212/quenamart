@@ -81,6 +81,10 @@ Checkpoint A adds a separate, locally implemented (not production-deployed) one-
 - Enforce data boundaries with Supabase RLS as the final database control. The app's role matrix is a UX and server foundation, not a replacement for RLS.
 - Sensitive HPP, capital, profit, and other financial fields need explicit role grants and database policies. The deployed product schema grants HPP access to OWNER and ADMIN only; other financial modules remain undecided.
 
+## Rupiah input convention
+
+All editable monetary fields use the shared `RupiahInput` component from `src/components/ui/rupiah-input.tsx` and the exact parser/formatter in `src/lib/money.ts`. The input displays Indonesian grouping (`120000` as `120.000`, with an `Rp` prefix) while emitting a canonical decimal string to application state and server contracts. Never create ad-hoc Rupiah parsing/formatting or use a JavaScript floating-point value as the persistence authority. Keep quantity, percentage, identifier, and date fields out of this convention.
+
 ## Routes
 
 `/login` is public and redirects active authenticated profiles to their role landing page. `/dashboard` and workspace routes require an active profile. Unknown workspace section URLs return 404. `/stok` remains read-only; Stock Opname provides the controlled opname workflow for OWNER, ADMIN, and GUDANG, while KASIR is denied. Purchasing provides controlled physical receipts to OWNER/ADMIN/GUDANG and financial nota/payable/payment views to OWNER/ADMIN only. KASIR has no purchasing access.

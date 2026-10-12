@@ -20,6 +20,8 @@ Cart state and commercial totals come from `pos_cart_workspace_read`. Mutations 
 
 P1C does not complete sales, record payment, move stock, write COGS or revenue, activate WAC, or run bootstrap. Checkout remains pending a later phase. Product UI intentionally omits costing fields.
 
+All editable Rupiah fields across the workspace use `RupiahInput` and `src/lib/money.ts`. The input displays Indonesian thousands separators while supplying exact canonical decimal strings to application state; future monetary inputs must reuse this component/parser rather than add custom formatting.
+
 ## P1D-A sale evidence foundation
 
 Migration `20260929340000_pos_sales_evidence_v1.sql` adds native sale, item snapshot, split-capable tender, checkout-request, manager-protected COGS/source-layer allocation, and append-only future cost-resolution evidence schemas, plus the `COMPLETED` cart state/event values. It adds a private sequence for the future `QPOS-YYYYMMDD-NNNNNNNN` receipt number. Existing cart mutation functions still accept only ACTIVE carts; P1D-A adds no function capable of completing a sale.

@@ -5,7 +5,7 @@ BEGIN
     OR coalesce(host(inet_server_addr()),'') NOT IN ('127.0.0.1','::1')
     OR inet_server_port()<>55432
     OR current_setting('server_version_num')::integer/10000<>15
-    OR to_regprocedure('public.native_product_create(uuid,text,text,text,text,text,text,text,numeric)') IS NULL
+    OR to_regprocedure('public.native_product_create(uuid,text,text,text,text,text,text,text,numeric,numeric)') IS NULL
     OR NOT EXISTS(SELECT 1 FROM quena_staging.environment WHERE name='quena_stock_staging') THEN
     RAISE EXCEPTION 'Refusing native product runtime test outside pinned disposable PostgreSQL 15 staging';
   END IF;
@@ -29,18 +29,20 @@ SELECT set_config('quena.test_outlet', :'outlet_id', true),
        set_config('quena.test_denied_request', :'denied_request_id', true);
 SELECT count(*) AS movements_before FROM public.stock_movements \gset
 SELECT count(*) AS cost_events_before FROM public.inventory_cost_events \gset
+SELECT count(*) AS cost_projection_before FROM public.inventory_cost_projections \gset
 SELECT count(*) AS hpp_batches_before FROM public.inventory_cost_hpp_acceptance_batches \gset
 SELECT set_config('quena.test_before_movements', :'movements_before', true),
        set_config('quena.test_before_cost_events', :'cost_events_before', true),
+       set_config('quena.test_before_cost_projections', :'cost_projection_before', true),
        set_config('quena.test_before_hpp_batches', :'hpp_batches_before', true);
 
 -- OWNER can create. Setting the claim and role mirrors an authenticated RPC call.
 SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001',true);
 SET LOCAL ROLE authenticated;
 SELECT public.native_product_create(:'request_id'::uuid, :'sku', 'Native staging product', 'Groceries', 'pcs',
-  'Test Brand', 'A-01', :'barcode', 12345.50) AS owner_result \gset
+  'Test Brand', 'A-01', :'barcode', 95000, 12345.50) AS owner_result \gset
 SELECT public.native_product_create(:'request_id'::uuid, :'sku', 'Native staging product', 'Groceries', 'pcs',
-  'Test Brand', 'A-01', :'barcode', 12345.50) AS owner_replay \gset
+  'Test Brand', 'A-01', :'barcode', 95000, 12345.50) AS owner_replay \gset
 RESET ROLE;
 SELECT (:'owner_result'::jsonb->>'product_id')::uuid AS product_id \gset
 SELECT set_config('quena.test_product', :'product_id', true),
@@ -54,6 +56,10 @@ BEGIN
       AND s.outlet_id=current_setting('quena.test_outlet')::uuid AND s.amount=12345.50)
     OR (SELECT count(*) FROM public.product_selling_price_history h WHERE h.product_id=v_product
       AND h.outlet_id=current_setting('quena.test_outlet')::uuid AND h.amount=12345.50)<>1
+    OR NOT EXISTS(SELECT 1 FROM public.product_costs c WHERE c.product_id=v_product
+      AND c.outlet_id=current_setting('quena.test_outlet')::uuid AND c.hpp=95000 AND c.source_import_row_id IS NULL)
+    OR (SELECT count(*) FROM public.product_cost_history h WHERE h.product_id=v_product
+      AND h.outlet_id=current_setting('quena.test_outlet')::uuid AND h.hpp=95000 AND h.source_import_row_id IS NULL)<>1
     OR NOT EXISTS(SELECT 1 FROM public.product_barcodes b WHERE b.product_id=v_product
       AND b.barcode=current_setting('quena.test_barcode') AND b.is_active AND b.source_import_row_id IS NULL)
     OR NOT EXISTS(SELECT 1 FROM public.product_inventory i WHERE i.product_id=v_product
@@ -75,7 +81,7 @@ BEGIN
         AND e.balance_before=0 AND e.balance_after=0 AND e.quantity_delta=0)
     OR NOT EXISTS(SELECT 1 FROM public.native_product_creation_requests r WHERE r.request_id=current_setting('quena.test_request')::uuid
       AND r.actor_id='a0000000-0000-4000-8000-000000000001' AND r.outlet_id=current_setting('quena.test_outlet')::uuid
-      AND r.product_id=v_product AND r.source_system='QUENA_NATIVE') THEN
+      AND r.product_id=v_product AND r.source_system='QUENA_NATIVE' AND r.reference_hpp=95000) THEN
     RAISE EXCEPTION 'Owner native product, zero baseline, price history, barcode, or provenance evidence is missing';
   END IF;
   IF (SELECT result FROM public.native_product_creation_requests WHERE request_id=current_setting('quena.test_request')::uuid)
@@ -89,7 +95,7 @@ DECLARE v_message text;
 BEGIN
   BEGIN
     PERFORM public.native_product_create(current_setting('quena.test_request')::uuid,current_setting('quena.test_sku'),
-      'Changed name','Groceries','pcs','Test Brand','A-01',current_setting('quena.test_barcode'),12345.50);
+      'Changed name','Groceries','pcs','Test Brand','A-01',current_setting('quena.test_barcode'),95000,12345.50);
     RAISE EXCEPTION 'Changed request payload unexpectedly replayed';
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
@@ -97,7 +103,7 @@ BEGIN
   END;
   BEGIN
     PERFORM public.native_product_create(current_setting('quena.test_duplicate_sku_request')::uuid,
-      current_setting('quena.test_sku'),'Another product','Groceries','pcs',NULL,NULL,NULL,1000);
+      current_setting('quena.test_sku'),'Another product','Groceries','pcs',NULL,NULL,NULL,95000,1000);
     RAISE EXCEPTION 'Duplicate SKU unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
@@ -105,7 +111,7 @@ BEGIN
   END;
   BEGIN
     PERFORM public.native_product_create(current_setting('quena.test_duplicate_barcode_request')::uuid,
-      NULL,'Another product','Groceries','pcs',NULL,NULL,current_setting('quena.test_barcode'),1000);
+      NULL,'Another product','Groceries','pcs',NULL,NULL,current_setting('quena.test_barcode'),95000,1000);
     RAISE EXCEPTION 'Duplicate barcode unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
@@ -137,7 +143,7 @@ END $pos_assertions$;
 -- ADMIN is allowed; KASIR and GUDANG are denied.
 SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000002',true);
 SET LOCAL ROLE authenticated;
-SELECT public.native_product_create(:'admin_request_id'::uuid,NULL,'Admin native product','Household','box',NULL,NULL,NULL,2500) AS admin_result \gset
+SELECT public.native_product_create(:'admin_request_id'::uuid,NULL,'Admin native product','Household','box',NULL,NULL,NULL,5000,2500) AS admin_result \gset
 RESET ROLE;
 SELECT (:'admin_result'::jsonb->>'product_id') AS admin_product \gset
 SELECT set_config('quena.test_admin_product', :'admin_product', true);
@@ -148,7 +154,7 @@ DECLARE v_message text;
 BEGIN
   BEGIN
     PERFORM public.native_product_create(current_setting('quena.test_denied_request')::uuid,NULL,
-      'Denied product','Other','pcs',NULL,NULL,NULL,1000);
+      'Denied product','Other','pcs',NULL,NULL,NULL,1000,1000);
     RAISE EXCEPTION 'KASIR creation unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
@@ -162,7 +168,7 @@ DO $gudang_denied$
 DECLARE v_message text;
 BEGIN
   BEGIN
-    PERFORM public.native_product_create(gen_random_uuid(),NULL,'Denied product','Other','pcs',NULL,NULL,NULL,1000);
+    PERFORM public.native_product_create(gen_random_uuid(),NULL,'Denied product','Other','pcs',NULL,NULL,NULL,1000,1000);
     RAISE EXCEPTION 'GUDANG creation unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
@@ -175,6 +181,7 @@ DO $no_stock_or_cost_writes$
 BEGIN
   IF (SELECT count(*) FROM public.stock_movements)<>current_setting('quena.test_before_movements')::bigint
     OR (SELECT count(*) FROM public.inventory_cost_events)<>current_setting('quena.test_before_cost_events')::bigint
+    OR (SELECT count(*) FROM public.inventory_cost_projections)<>current_setting('quena.test_before_cost_projections')::bigint
     OR (SELECT count(*) FROM public.inventory_cost_hpp_acceptance_batches)<>current_setting('quena.test_before_hpp_batches')::bigint
     OR (SELECT count(*) FROM public.stock_balance_projection b WHERE b.product_id IN
       (current_setting('quena.test_product')::uuid,current_setting('quena.test_admin_product')::uuid))<>2
@@ -213,4 +220,4 @@ BEGIN
 END $ipos_provenance_remains_strict$;
 ROLLBACK;
 
-\echo 'PASS: native product owner/admin authorization, idempotency, conflicts, POS lookup, and zero stock/cost mutation'
+\echo 'PASS: native product HPP reference/history, owner/admin authorization, idempotency, POS lookup, and zero stock/cost-ledger mutation'

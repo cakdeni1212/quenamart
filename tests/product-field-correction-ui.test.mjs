@@ -64,7 +64,8 @@ test('barcode choices are explicit and text inputs preserve leading zeros', () =
   assert.match(component, /Perbaiki barcode iPos/);
   assert.match(component, /ADD_ALIAS/);
   assert.match(component, /REPLACE_SOURCE/);
-  assert.match(component, /type="text" inputMode=\{moneyField \? "decimal" : "text"\}/);
+  assert.match(component, /moneyField \? <RupiahInput id=\{inputId\} name="correctedValue"/);
+  assert.match(component, /<input id=\{inputId\} name="correctedValue" type="text"/);
   assert.match(component, /Barcode ini sudah digunakan produk lain\./);
   assert.doesNotMatch(component, /barcode utama|primary barcode/i);
   assert.match(page, /sourceDisplay=\{sourceDisplay\(record\)\}/);

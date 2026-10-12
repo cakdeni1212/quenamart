@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 import {
   applyProductFieldCorrectionIntentAction,
   issueProductFieldCorrectionIntentAction,
@@ -240,10 +241,11 @@ export function FieldCorrectionControls(props: Props) {
         <label><input type="radio" name={`barcode-operation-${productId}`} value="REPLACE_SOURCE" checked={barcodeOperation === "REPLACE_SOURCE"} onChange={() => setBarcodeOperation("REPLACE_SOURCE")} /><span><strong>Perbaiki barcode iPos</strong><small>Perbaiki barcode yang berasal dari iPos. Barcode tambahan tetap disimpan.</small></span></label>
       </fieldset>}
       <label htmlFor={inputId}>{label}</label>
-      <input id={inputId} name="correctedValue" type="text" inputMode={moneyField ? "decimal" : "text"} autoComplete="off"
+      {moneyField ? <RupiahInput id={inputId} name="correctedValue" required value={value} onValueChange={setValue}
+        placeholder="15.000" aria-label={label} /> : <input id={inputId} name="correctedValue" type="text" autoComplete="off"
         autoCapitalize="off" spellCheck={false} required maxLength={fieldKey === "barcode" ? 256 : 4000}
         value={value} onChange={(event) => setValue(event.target.value)}
-        placeholder={fieldKey === "barcode" ? "Pindai atau ketik barcode" : fieldKey === "rack_label" ? "Contoh: Rak A-03" : "Contoh: 15.000 atau 15.000,50"} />
+        placeholder={fieldKey === "barcode" ? "Pindai atau ketik barcode" : "Contoh: Rak A-03"} />}
       <label htmlFor={reasonId}>Alasan koreksi</label>
       <textarea id={reasonId} name="reason" required maxLength={4000} value={reason} onChange={(event) => setReason(event.target.value)}
         placeholder={fieldKey === "rack_label" ? "Contoh: posisi barang di toko berbeda dari data iPos" : "Jelaskan alasan koreksi singkat"} rows={2} />

@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { createNativeProduct, type NativeProductFormState } from "@/app/actions/native-product";
+import { RupiahInput } from "@/components/ui/rupiah-input";
+import { compareRupiah } from "@/lib/money";
 
 function SaveButton() {
   const { pending } = useFormStatus();
@@ -25,6 +27,8 @@ export function NativeProductForm({
 }) {
   const [state, action] = useActionState(createNativeProduct, {} as NativeProductFormState);
   const [automaticSku, setAutomaticSku] = useState(false);
+  const [hpp, setHpp] = useState(state.values?.hpp ?? "");
+  const [sellingPrice, setSellingPrice] = useState(state.values?.sellingPrice ?? "");
   return <form className="native-product-form" action={action}>
     <input type="hidden" name="requestId" value={requestId} />
     <section className="native-product-section">
@@ -56,16 +60,21 @@ export function NativeProductForm({
     </section>
 
     <section className="native-product-section">
-      <h2>Penjualan</h2>
+      <h2>Penjualan dan HPP</h2>
       <div className="native-product-grid">
         <label className="native-product-field">Barcode
           <input name="barcode" maxLength={128} inputMode="numeric" defaultValue={state.values?.barcode} autoComplete="off" placeholder="Opsional — dapat dipindai" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
         </label>
+        <label className="native-product-field">HPP / Harga Pokok <span>*</span>
+          <RupiahInput name="hpp" required value={hpp} onValueChange={setHpp} placeholder="0" aria-label="HPP harga pokok Rupiah" />
+          <small>HPP referensi produk; nilai persediaan ditentukan saat barang masuk.</small>
+        </label>
         <label className="native-product-field">Harga Jual <span>*</span>
-          <span className="native-product-price-input"><span>Rp</span><input name="sellingPrice" required inputMode="decimal" defaultValue={state.values?.sellingPrice} placeholder="0" aria-label="Harga jual Rupiah" /></span>
+          <RupiahInput name="sellingPrice" required value={sellingPrice} onValueChange={setSellingPrice} placeholder="0" aria-label="Harga jual Rupiah" />
           <small>Harga disimpan untuk outlet aktif dan tercatat di riwayat harga.</small>
         </label>
       </div>
+      {compareRupiah(sellingPrice, hpp) === -1 && <p className="native-product-price-warning" role="status">Harga jual lebih rendah dari HPP.</p>}
     </section>
 
     <div className="native-product-stock-note"><strong>Stok produk baru</strong><span>Stok awal produk baru adalah 0. Tambahkan stok melalui Barang Masuk.</span></div>

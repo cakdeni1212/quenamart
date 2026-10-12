@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [migration, productList, createPage, action, form, posContracts, docs] = await Promise.all([
+const [migration, hppMigration, productList, createPage, action, form, posContracts, docs] = await Promise.all([
   read('../supabase/migrations/20260929380000_native_product_creation_v1.sql'),
+  read('../supabase/migrations/20260929390000_native_product_reference_hpp_v1.sql'),
   read('../app/(workspace)/produk/page.tsx'),
   read('../app/(workspace)/produk/tambah/page.tsx'),
   read('../src/app/actions/native-product.ts'),
@@ -48,6 +49,14 @@ test('current outlet selling price writes through the existing history trigger',
   assert.doesNotMatch(migration, /INSERT INTO public\.product_selling_price_history/);
   assert.match(migration, /NATIVE_PRODUCT_PRICE_INVALID/);
   assert.match(action, /p_selling_price: sellingPrice/);
+  assert.match(hppMigration, /p_reference_hpp numeric/);
+  assert.match(hppMigration, /INSERT INTO public\.product_costs\(product_id,outlet_id,hpp,source_import_row_id,created_by,updated_by\)/);
+  assert.match(hppMigration, /VALUES\(v_product,v_outlet,p_reference_hpp,NULL,v_actor,v_actor\)/);
+  assert.match(hppMigration, /'reference_hpp',p_reference_hpp/);
+  assert.match(hppMigration, /DROP FUNCTION public\.native_product_create\(uuid,text,text,text,text,text,text,text,numeric\)/);
+  assert.match(action, /p_reference_hpp: hpp/);
+  assert.match(form, /HPP \/ Harga Pokok/);
+  assert.match(form, /Harga jual lebih rendah dari HPP/);
   assert.match(action, /NATIVE_PRODUCT_SKU_EXISTS: "Kode SKU sudah digunakan\."/);
   assert.match(action, /NATIVE_PRODUCT_BARCODE_EXISTS: "Barcode sudah digunakan oleh produk lain\."/);
 });
@@ -59,8 +68,13 @@ test('native creation records only its audited zero baseline, without acquisitio
   assert.match(migration, /NATIVE_ZERO_BASELINE_ACCEPTED/);
   assert.match(migration, /VALUES\(v_product,v_outlet,0,NULL,v_actor,v_actor\)/);
   assert.doesNotMatch(migration, /INSERT\s+INTO\s+public\.(stock_movements|stock_movement_batches|inventory_cost_projections|inventory_cost_event_batches|inventory_cost_events|inventory_cost_source_layers|product_costs|product_cost_history|inventory_cost_hpp_acceptance_batches)/i);
+  assert.doesNotMatch(hppMigration, /INSERT\s+INTO\s+public\.(stock_movements|stock_movement_batches|inventory_cost_projections|inventory_cost_event_batches|inventory_cost_events|inventory_cost_source_layers|inventory_cost_hpp_acceptance_batches)/i);
+  assert.match(form, /name="hpp"/);
+  assert.match(form, /name="sellingPrice"/);
+  assert.match(hppMigration, /VALUES\(v_product,v_outlet,p_reference_hpp,NULL,v_actor,v_actor\)/);
+  assert.match(hppMigration, /DROP FUNCTION/);
   assert.doesNotMatch(migration, /inventory_cost_bootstrap_outlet\s*\(/i);
-  assert.doesNotMatch(form, /name="(?:hpp|initialStock|stockQuantity)"/i);
+  assert.doesNotMatch(form, /name="(?:initialStock|stockQuantity)"/i);
   assert.match(form, /Stok awal produk baru adalah 0/);
   assert.match(migration, /Stock baseline refresh requires an iPos source row/);
   assert.match(migration, /STOCK_CUTOVER_NATIVE_BASELINE_INVALID/);

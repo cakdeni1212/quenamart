@@ -44,7 +44,7 @@ SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000001'
 SET LOCAL ROLE authenticated;
 SELECT public.purchase_supplier_upsert(NULL,'C3A Staging Supplier',NULL,NULL,NULL,true) supplier_id \gset
 SELECT (public.native_product_create(gen_random_uuid(),'NATIVE-RECEIPT-STAGING',
-  'Native receipt staging product','Native','pcs',NULL,NULL,NULL,7500)->>'product_id')::uuid native_product \gset
+  'Native receipt staging product','Native','pcs',NULL,NULL,NULL,95000,7500)->>'product_id')::uuid native_product \gset
 SELECT set_config('quena.c3a.native_product',:'native_product',true);
 RESET ROLE;
 
@@ -172,7 +172,7 @@ SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000002'
 SET LOCAL ROLE authenticated;
 SELECT public.purchase_receipt_acquisition_estimate_save(:'native_receipt'::uuid,
   (SELECT id FROM public.purchase_receipt_items WHERE receipt_id=:'native_receipt'::uuid),2,0,
-  'MANAGER_ESTIMATE',5000,NULL,'Native post-bootstrap receipt fixture') native_estimate \gset
+  'MANAGER_ESTIMATE',93000,NULL,'Native post-bootstrap receipt fixture') native_estimate \gset
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000003',true);
@@ -192,8 +192,10 @@ BEGIN
   SELECT * INTO v_event FROM public.inventory_cost_events
     WHERE receipt_id=current_setting('quena.c3a.native_receipt')::uuid;
   IF v_stock<>10 OR v_cost.physical_quantity<>10 OR v_cost.valued_quantity<>10
-    OR v_cost.provisional_quantity<>10 OR v_cost.inventory_value<>50000 OR v_cost.current_wac<>5000
-    OR v_cost.valuation_status<>'PROVISIONAL' OR v_event.valuation_basis<>'MANAGER_ESTIMATE'
+    OR v_cost.provisional_quantity<>10 OR v_cost.inventory_value<>930000 OR v_cost.current_wac<>93000
+    OR v_cost.valuation_status<>'PROVISIONAL' OR v_event.valuation_basis<>'MANAGER_ESTIMATE' OR v_event.frozen_unit_cost<>93000
+    OR (SELECT hpp FROM public.product_costs WHERE product_id=current_setting('quena.c3a.native_product')::uuid
+      AND outlet_id=current_setting('quena.c3a.outlet')::uuid)<>95000
     OR NOT EXISTS(SELECT 1 FROM public.stock_movements m
       WHERE m.product_id=current_setting('quena.c3a.native_product')::uuid
         AND m.movement_type='PURCHASE_RECEIPT' AND m.quantity_delta=10) THEN

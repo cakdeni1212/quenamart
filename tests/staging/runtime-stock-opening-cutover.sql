@@ -48,7 +48,7 @@ WHERE id=:'previous_period'::uuid;
 SELECT set_config('request.jwt.claim.sub', :'owner_id', false);
 SET ROLE authenticated;
 SELECT (public.native_product_create(gen_random_uuid(),'CUTOVER-NATIVE-ZERO','Native zero baseline cutover fixture',
-  'Native','pcs',NULL,NULL,NULL,9000)->>'product_id')::uuid AS native_product_id \gset
+  'Native','pcs',NULL,NULL,NULL,12000,9000)->>'product_id')::uuid AS native_product_id \gset
 RESET ROLE;
 SELECT set_config('quena.native_product', :'native_product_id', false);
 

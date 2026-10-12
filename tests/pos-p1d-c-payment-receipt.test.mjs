@@ -11,7 +11,9 @@ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8
 test("payment UI offers the four single-tender methods and blocks obvious checkout blockers", () => {
   for (const method of ["CASH", "QRIS", "CARD", "E_WALLET"]) assert.ok(ui.includes(`"${method}"`));
   assert.match(ui, /cart\.items\.length > 0[\s\S]*cart\.items\.every\(\(item\) => priceStatus\(item\) === "CURRENT"\) && !busy/);
-  assert.match(ui, /received < total/);
+  assert.match(ui, /compareRupiah\(cashReceived, total\) !== -1/);
+  assert.match(ui, /paymentMethod === "CASH" && !cashSufficient/);
+  assert.match(ui, /<RupiahInput id="pos-cash-received"[\s\S]*onValueChange=\{\(value\) =>/);
   assert.match(ui, /Uang Pas/);
   assert.match(ui, /KEMBALIAN/);
   assert.match(ui, /TOTAL BELANJA/);
