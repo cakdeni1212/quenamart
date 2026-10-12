@@ -1,6 +1,6 @@
 import { canAccessSection, type UserRole } from "../auth/roles.ts";
 import { isUuid } from "./context.ts";
-import { formatRupiahInput, parseRupiahInput } from "../money.ts";
+import { formatRupiahInput, parseCanonicalRupiah, parseRupiahInput } from "../money.ts";
 
 export const CORRECTION_FIELDS = ["barcode", "rack_label", "hpp", "selling_price"] as const;
 export type CorrectionField = (typeof CORRECTION_FIELDS)[number];
@@ -56,7 +56,9 @@ export function forgetCorrectionRequestId(storage: CorrectionIntentStorage, prod
 
 /** Parse Indonesian currency notation exactly as decimal digits before converting for JSON RPC. */
 export function parseIndonesianMoney(input: string): { value: number; canonical: string } | null {
-  const canonical = parseRupiahInput(input);
+  const trimmed = input.trim().replace(/^rp\s*/i, "");
+  const displayValue = trimmed.includes(",") || /^\d{1,3}(?:\.\d{3})+$/.test(trimmed);
+  const canonical = displayValue ? parseRupiahInput(input) : parseCanonicalRupiah(input);
   if (!canonical) return null;
   const [whole, fraction = "00"] = canonical.split(".");
   const cents = BigInt(whole) * BigInt("100") + BigInt(fraction.padEnd(2, "0"));

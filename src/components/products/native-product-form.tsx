@@ -41,17 +41,20 @@ export function NativeProductForm({
           <input name="sku" required={!automaticSku} disabled={automaticSku} maxLength={100} defaultValue={state.values?.sku} autoComplete="off" placeholder="Contoh: BR-001" />
           <span className="native-product-auto"><input type="checkbox" name="autoSku" checked={automaticSku} onChange={(event) => setAutomaticSku(event.target.checked)} /> Buat otomatis</span>
         </label>
+        <label className="native-product-field">Barcode
+          <input name="barcode" maxLength={128} inputMode="numeric" defaultValue={state.values?.barcode} autoComplete="off" placeholder="Opsional — dapat dipindai" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
+        </label>
         <label className="native-product-field">Kategori <span>*</span>
           <input name="category" required maxLength={120} list="native-product-categories" defaultValue={state.values?.category} placeholder="Pilih atau ketik kategori" />
           <datalist id="native-product-categories">{categories.map((value) => <option key={value} value={value} />)}</datalist>
         </label>
-        <label className="native-product-field">Satuan <span>*</span>
-          <input name="unit" required maxLength={40} list="native-product-units" defaultValue={state.values?.unit} placeholder="Contoh: pcs, botol, kg" />
-          <datalist id="native-product-units">{units.map((value) => <option key={value} value={value} />)}</datalist>
-        </label>
         <label className="native-product-field">Merek
           <input name="brand" maxLength={120} list="native-product-brands" defaultValue={state.values?.brand} placeholder="Opsional" />
           <datalist id="native-product-brands">{brands.map((value) => <option key={value} value={value} />)}</datalist>
+        </label>
+        <label className="native-product-field">Satuan <span>*</span>
+          <input name="unit" required maxLength={40} list="native-product-units" defaultValue={state.values?.unit} placeholder="Contoh: pcs, botol, kg" />
+          <datalist id="native-product-units">{units.map((value) => <option key={value} value={value} />)}</datalist>
         </label>
         <label className="native-product-field">Rak
           <input name="rack" maxLength={120} defaultValue={state.values?.rack} placeholder="Opsional" />
@@ -60,11 +63,8 @@ export function NativeProductForm({
     </section>
 
     <section className="native-product-section">
-      <h2>Penjualan dan HPP</h2>
+      <h2>Harga</h2>
       <div className="native-product-grid">
-        <label className="native-product-field">Barcode
-          <input name="barcode" maxLength={128} inputMode="numeric" defaultValue={state.values?.barcode} autoComplete="off" placeholder="Opsional — dapat dipindai" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
-        </label>
         <label className="native-product-field">HPP / Harga Pokok <span>*</span>
           <RupiahInput name="hpp" required value={hpp} onValueChange={setHpp} placeholder="0" aria-label="HPP harga pokok Rupiah" />
           <small>HPP referensi produk; nilai persediaan ditentukan saat barang masuk.</small>

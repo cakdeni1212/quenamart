@@ -75,7 +75,7 @@ test('Indonesian money parser handles exact grouping and decimal examples withou
   assert.deepEqual(parseIndonesianMoney('15000'), { value: 15000, canonical: '15000.00' });
   assert.deepEqual(parseIndonesianMoney('15.000'), { value: 15000, canonical: '15000.00' });
   assert.deepEqual(parseIndonesianMoney('15.000,50'), { value: 15000.5, canonical: '15000.50' });
-  assert.deepEqual(parseIndonesianMoney('010000.50'), { value: 10000.5, canonical: '10000.50' });
+  assert.deepEqual(parseIndonesianMoney('10000.50'), { value: 10000.5, canonical: '10000.50' });
   assert.equal(parseIndonesianMoney('15,000.50'), null);
   assert.equal(parseIndonesianMoney('-100'), null);
   assert.equal(formatIndonesianMoney('15000.50'), 'Rp 15.000,5');

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type InputHTMLAttributes } from "react";
-import { formatRupiahInput, parseRupiahInput } from "@/lib/money";
+import { editRupiahInput, formatRupiahInput } from "@/lib/money";
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "defaultValue" | "onChange" | "type"> & {
   value: string;
@@ -35,40 +35,18 @@ export function RupiahInput({ value, onValueChange, name, currencyPrefix = true,
 
   function handleChange(next: string, selectionStart: number | null) {
     const digitsBeforeCaret = next.slice(0, selectionStart ?? next.length).replace(/\D/g, "").length;
-    const canonical = parseRupiahInput(next);
-    if (canonical !== null) {
-      lastEmitted.current = canonical;
-      onValueChange(canonical);
-      const formatted = formatRupiahInput(canonical);
-      setDraft(formatted);
+    const edit = editRupiahInput(next);
+    setDraft(edit.display);
+    if (edit.canonical !== null) {
+      lastEmitted.current = edit.canonical;
+      onValueChange(edit.canonical);
       requestAnimationFrame(() => {
         const input = inputRef.current;
         if (!input) return;
-        const caret = caretAfterDigits(formatted, digitsBeforeCaret);
+        const caret = edit.incomplete ? edit.display.length : caretAfterDigits(edit.display, digitsBeforeCaret);
         input.setSelectionRange(caret, caret);
       });
-      return;
-    }
-
-    // Keep a trailing decimal separator editable while the user enters cents.
-    const incomplete = next.replace(/^rp\s*/i, "").replace(/[^\d.,\s]/g, "").replace(/[\s\u00a0]/g, "");
-    const trailingSeparator = /[,\.]$/.test(incomplete);
-    if (trailingSeparator) {
-      const base = parseRupiahInput(incomplete.slice(0, -1));
-      if (base !== null) {
-        lastEmitted.current = base;
-        onValueChange(base);
-        const formatted = `${formatRupiahInput(base)},`;
-        setDraft(formatted);
-        requestAnimationFrame(() => {
-          const input = inputRef.current;
-          if (input) input.setSelectionRange(formatted.length, formatted.length);
-        });
-        return;
-      }
-    }
-    setDraft(incomplete);
-    if (!incomplete) {
+    } else if (edit.display === "") {
       lastEmitted.current = "";
       onValueChange("");
     }

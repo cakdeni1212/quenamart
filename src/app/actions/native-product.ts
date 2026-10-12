@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { parseRupiahInput } from "@/lib/money";
+import { parseCanonicalRupiah } from "@/lib/money";
 
 export type NativeProductFormState = {
   error?: string;
@@ -68,12 +68,12 @@ export async function createNativeProduct(
   if (!values.name || !values.category || !values.unit) {
     return { error: "Nama produk, kategori, dan satuan wajib diisi.", values };
   }
-  const hpp = parseRupiahInput(values.hpp);
+  const hpp = parseCanonicalRupiah(values.hpp);
   if (hpp === null || hpp === "") {
     return { error: "HPP / Harga Pokok wajib diisi dengan nilai Rupiah yang valid.", values };
   }
   if (cents(hpp) >= BigInt("100000000000000")) return { error: messages.NATIVE_PRODUCT_HPP_INVALID, values };
-  const sellingPrice = parseRupiahInput(values.sellingPrice);
+  const sellingPrice = parseCanonicalRupiah(values.sellingPrice);
   if (sellingPrice === null || sellingPrice === "") {
     return { error: "Masukkan harga jual yang valid, maksimal 2 angka desimal.", values };
   }
