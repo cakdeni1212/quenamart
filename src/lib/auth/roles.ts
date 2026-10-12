@@ -25,7 +25,7 @@ export type AppSection =
   | "import-ipos";
 
 const sectionAccess: Record<AppSection, readonly UserRole[]> = {
-  dashboard: ROLES,
+  dashboard: ["OWNER", "ADMIN"],
   kasir: ["OWNER", "ADMIN", "KASIR"],
   transaksi: ["OWNER", "ADMIN", "KASIR"],
   produk: ["OWNER", "ADMIN", "GUDANG"],

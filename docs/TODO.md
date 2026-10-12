@@ -87,7 +87,7 @@
 - Implement loyalty rules, member records, reward catalog, redemption, and point ledger.
 - Design future due-date reminder policy separately; external WhatsApp integration remains out of scope.
 - Implement reports and charts after accounting definitions and role permissions are agreed.
-- Replace dashboard placeholders with authorized data only after source modules and definitions exist.
+- [x] Replace the dashboard placeholder with the bounded OWNER/ADMIN operational read model; definitions are documented in `docs/DATABASE.md`. Detailed sales, stock, and Tempo workflows remain in their dedicated workspaces.
 
 ## C3B follow-up and WAC activation blockers
 

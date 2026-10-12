@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-12 — Owner dashboard
+
+- Replaced the dashboard placeholder with an OWNER/ADMIN operational view backed by bounded read-only aggregates for completed POS sales, payment methods, effective stock, finalized supplier Tempo, costing readiness, and open stock opname.
+- Dashboard sales days use Asia/Jakarta. Gross profit appears only when WAC is active and all sale-time COGS evidence for the day is resolved. No checkout, stock, payment, costing, bootstrap, or cutover operation is available from the dashboard.
+
 ## 2026-10-12 — Native POS sales transaction history
 
 - Added a read-only `/transaksi` history for completed native POS sales, with Jakarta-local date ranges, sale-number and payment-method filters, filtered summaries, stable 20-row pagination, responsive transaction cards, and immutable sale detail.

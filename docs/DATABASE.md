@@ -159,3 +159,20 @@ Manual IN creates an UNVALUED C3B source layer. Manual OUT calls the C3B exact-t
 OWNER/ADMIN/GUDANG can manage operational drafts; only OWNER/ADMIN can post; KASIR is denied. RLS permits operational reads for those roles and direct DML remains revoked. Internal SECURITY DEFINER RPCs use fixed `pg_catalog` search paths and `auth.uid()` actor binding. The bounded source receipt lookup returns posted receipts from the active outlet and selected supplier/product, without financial values.
 
 Posting takes the shared outlet cutover advisory lock, then return/request and linked receipt-item locks, product-ordered stock rows, authority period, costing projections, and source-layer balances. It checks cumulative linked returns against accepted plus bonus and independently checks current stock. REFERENCE_ONLY remains stock-only; BOOTSTRAP_READY blocks before mutation; WAC_ACTIVE writes movement, aggregate-WAC event/projection, and C3B layer allocations atomically. Invoice, payable, payment, due-date, and credit-note data are untouched.
+# Owner dashboard read model
+
+`owner_dashboard_read(7|30)` is a bounded, read-only OWNER/ADMIN summary for the
+active stock-authority outlet. Sales revenue and transaction counts include
+completed native `QUENA_POS` sales only; average basket is revenue divided by
+completed sale count. Daily windows use `Asia/Jakarta`, and payment totals are
+aggregated from payment rows separately from sale items so split payments do
+not multiply totals.
+
+Gross profit is recognized sale revenue less resolved sale-time COGS evidence.
+The dashboard shows a numeric result only with `WAC_ACTIVE` authority and
+complete `RESOLVED` evidence for each sale item; provisional or unknown COGS is
+never treated as zero. Low stock uses `stock_balance_projection.effective_quantity`
+against `product_inventory.minimum_quantity`. Tempo outstanding is limited to
+finalized TEMPO invoices and reduced by their payment allocations. The read
+contract returns bounded shortlists and no source-layer, HPP, WAC, inventory
+valuation, or raw COGS details.
