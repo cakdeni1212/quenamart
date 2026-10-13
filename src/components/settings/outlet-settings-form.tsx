@@ -5,6 +5,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { updateOutletSettings, type OutletSettingsInput } from "@/app/actions/outlet-settings";
 import type { OutletSettings } from "@/lib/settings/outlet";
 import styles from "@/components/settings/settings.module.css";
+import primaryAction from "@/components/ui/workspace-primary-action.module.css";
 
 type EditableFields = Omit<OutletSettingsInput, "id" | "is_active">;
 
@@ -55,8 +56,8 @@ export function OutletSettingsForm({ outlet, canEdit }: { outlet: OutletSettings
     <section className={styles.formSection}>
       <header><h2>Informasi Toko</h2><p>Identitas utama yang digunakan pada ruang kerja.</p></header>
       <div className={styles.fields}>
-        <label>Nama Outlet <span>*</span><input required maxLength={120} value={fields.name} onChange={(event) => setField("name", event.target.value)} readOnly={!canEdit} /></label>
-        <label>Nama yang tampil ke pelanggan<input maxLength={160} value={fields.customer_display_name} onChange={(event) => setField("customer_display_name", event.target.value)} readOnly={!canEdit} placeholder="Mengikuti nama outlet bila dikosongkan" /></label>
+        <label><span className={styles.labelText}>Nama Outlet <span className={styles.required} aria-hidden="true">*</span></span><input required maxLength={120} value={fields.name} onChange={(event) => setField("name", event.target.value)} readOnly={!canEdit} /></label>
+        <label><span className={styles.labelText}>Nama yang tampil ke pelanggan</span><input maxLength={160} value={fields.customer_display_name} onChange={(event) => setField("customer_display_name", event.target.value)} readOnly={!canEdit} placeholder="Mengikuti nama outlet bila dikosongkan" /></label>
         <label>Kode Outlet<input value={outlet.code} readOnly aria-readonly="true" /><small>Kode outlet merupakan identitas tetap dan tidak dapat diubah.</small></label>
       </div>
     </section>
@@ -90,7 +91,7 @@ export function OutletSettingsForm({ outlet, canEdit }: { outlet: OutletSettings
 
     <div className={styles.formFooter}>
       {outlet.updated_at && <span>Terakhir diperbarui {new Date(outlet.updated_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" })}</span>}
-      {canEdit && <button className="button-primary" type="submit" disabled={pending || !changed}>{pending ? "Menyimpan…" : "Simpan Perubahan"}</button>}
+      {canEdit && <button className={primaryAction.primary} type="submit" disabled={pending || !changed}>{pending ? "Menyimpan..." : "Simpan Perubahan"}</button>}
     </div>
     {notice && <p role="status" className={`${styles.notice} ${notice.kind === "success" ? styles.success : styles.error}`}>{notice.text}</p>}
   </form>;

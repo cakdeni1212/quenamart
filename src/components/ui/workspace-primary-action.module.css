@@ -76,10 +76,16 @@
   outline-offset: 2px;
 }
 
-.primary:disabled,
 .secondary:disabled,
 .danger:disabled,
 .ghost:disabled {
   opacity: .62;
+  cursor: not-allowed;
+}
+
+.primary:disabled {
+  border-color: #dce6d8;
+  background: #eaf0e7;
+  color: #84927f;
   cursor: not-allowed;
 }

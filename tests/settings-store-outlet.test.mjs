@@ -3,15 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [home, detail, form, action, migration, receipt, docs, architecture] = await Promise.all([
+const [home, detail, form, action, migration, receipt, architecture, styles, buttons] = await Promise.all([
   read("../app/(workspace)/pengaturan/page.tsx"),
   read("../app/(workspace)/pengaturan/toko-outlet/page.tsx"),
   read("../src/components/settings/outlet-settings-form.tsx"),
   read("../src/app/actions/outlet-settings.ts"),
   read("../supabase/migrations/20260929474000_store_outlet_settings_v1.sql"),
   read("../src/components/pos/pos-receipt.tsx"),
-  read("../docs/DATABASE.md"),
   read("../docs/ARCHITECTURE.md"),
+  read("../src/components/settings/settings.module.css"),
+  read("../src/components/ui/workspace-primary-action.module.css"),
 ]);
 
 test("Settings directory links implemented sections and leaves future sections non-navigable", () => {
@@ -37,12 +38,21 @@ test("outlet route gives OWNER edit controls and ADMIN read-only access", () => 
 });
 
 test("form validates identity, preserves phone strings, avoids duplicate/no-op saves, and keeps timezone read-only", () => {
+  assert.match(form, /Nama Outlet <span className=\{styles\.required\} aria-hidden="true">\*<\/span>/);
+  assert.match(form, /Nama yang tampil ke pelanggan<\/span><input/);
   assert.match(form, /required maxLength=\{120\}/);
   assert.match(action, /if \(!values\.name\)/);
   assert.match(action, /if \(values\.email && !\/\^\[\^\\s@\]/);
   assert.match(form, /type="tel" maxLength=\{40\}/);
   assert.doesNotMatch(form, /parseInt\([^)]*phone|Number\([^)]*phone/);
-  assert.match(form, /disabled=\{pending \|\| !changed\}/);
+  assert.match(form, /className=\{primaryAction\.primary\} type="submit" disabled=\{pending \|\| !changed\}/);
+  assert.match(form, /pending \? "Menyimpan\.\.\." : "Simpan Perubahan"/);
+  assert.match(form, /setNotice\(\{ kind: result\.ok \? "success" : "error", text: result\.message \}\)/);
+  assert.match(form, /if \(result\.ok\) router\.refresh\(\)/);
+  assert.match(styles, /\.labelText\{display:block;min-height:1\.4em/);
+  assert.match(styles, /\.formFooter\{[^}]*padding:14px 2px 22px/);
+  assert.match(styles, /@media\(max-width:700px\)[\s\S]*\.formFooter\{align-items:stretch;flex-direction:column\}[\s\S]*\.formFooter button\{width:100%\}/);
+  assert.match(buttons, /\.primary:disabled\s*\{\s*border-color: #dce6d8;\s*background: #eaf0e7;\s*color: #84927f;\s*cursor: not-allowed;/);
   assert.match(form, /Asia\/Jakarta/);
   assert.match(form, /readOnly aria-readonly="true"/);
   assert.match(migration, /updated_by=v_actor,updated_at=now\(\)/);
