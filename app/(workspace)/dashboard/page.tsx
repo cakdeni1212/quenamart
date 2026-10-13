@@ -53,6 +53,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </article>
       </section>
 
+      <section className={styles.operatingSummary} aria-label="Ringkasan biaya operasional">
+        <div><span>Pengeluaran hari ini</span><strong>{salesMoney(data.expenses.expenses_today)}</strong><Link href="/pengeluaran">Lihat pengeluaran →</Link></div>
+        <div><span>Laba operasional</span>{data.expenses.operating_profit === null
+          ? <><strong className={styles.operatingUnavailable}>Belum tersedia</strong><small>{data.expenses.gross_profit_status === "COSTING_INACTIVE" ? "Costing belum aktif" : "Laba kotor belum lengkap"}</small></>
+          : <><strong>{salesMoney(data.expenses.operating_profit)}</strong><small>Laba kotor − pengeluaran tercatat</small></>}</div>
+      </section>
+
       <section className={styles.mainGrid}>
         <article className={styles.card}>
           <div className={styles.cardHead}><div><h2>Tren Penjualan</h2><p>Omzet harian · {data.trend_days} hari terakhir</p></div>

@@ -38,6 +38,7 @@ done
     AND NOT EXISTS(SELECT 1 FROM public.stock_authority_periods p WHERE p.outlet_id=outlets.id AND p.ended_at IS NULL)"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-costing-controls.sql"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-activation-precheck.sql"
+"${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-operational-expenses-pre-wac.sql"
 
 first_log="$(mktemp)"
 second_log="$(mktemp)"
@@ -66,4 +67,5 @@ fi
 echo "Two-session activation race: exactly one WAC_ACTIVE transition persisted."
 
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-pos-e2e.sql"
+"${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-operational-expenses-post-wac.sql"
 echo "GO-LIVE COSTING CONTROLS POSTGRESQL 15 STAGING PASS"

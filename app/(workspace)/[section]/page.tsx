@@ -7,6 +7,7 @@ const labels: Record<string, { title: string; section: AppSection; description: 
   stok: { title: "Stok", section: "stok", description: "Pemantauan persediaan dan pergerakan stok." },
   "audit-produk": { title: "Audit Produk", section: "audit-produk", description: "Pemeriksaan kelengkapan dan kondisi data produk." },
   pembelian: { title: "Pembelian", section: "pembelian", description: "Pencatatan pembelian barang dari supplier." },
+  pengeluaran: { title: "Pengeluaran", section: "expenses", description: "Catat dan pantau biaya operasional Quena Mart." },
   "tempo-supplier": { title: "Tempo Supplier", section: "tempo-supplier", description: "Pemantauan tagihan dan pembayaran supplier." },
   member: { title: "Member", section: "member", description: "Data pelanggan dan aktivitas keanggotaan." },
   laporan: { title: "Laporan", section: "laporan", description: "Ringkasan dan analisis performa toko." },
