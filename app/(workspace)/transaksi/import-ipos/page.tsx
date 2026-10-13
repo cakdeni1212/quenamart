@@ -15,9 +15,10 @@ export default async function IposSalesImportPage({ searchParams }: { searchPara
   if (!profile.is_active || (profile.role !== "OWNER" && profile.role !== "ADMIN")) redirect(landingPathForRole(profile.role));
   const params = await searchParams;
   const batchParam = Array.isArray(params.batch) ? params.batch[0] : params.batch;
+  const validBatchParam = Boolean(batchParam && /^[0-9a-f-]{36}$/i.test(batchParam));
   const supabase = await createClient();
   const [batchResult, recentResult] = await Promise.all([
-    batchParam && /^[0-9a-f-]{36}$/i.test(batchParam)
+    validBatchParam
       ? supabase.rpc("ipos_sales_import_batch_read", { p_batch_id: batchParam })
       : Promise.resolve({ data: null, error: null }),
     supabase.rpc("ipos_sales_import_batches_read", { p_limit: 8 }),
@@ -26,8 +27,18 @@ export default async function IposSalesImportPage({ searchParams }: { searchPara
     const row = record(value);
     return { id: string(row.id), reportFrom: string(row.reportFrom), reportTo: string(row.reportTo), filename: string(row.filename), transactions: Number(row.transactions ?? 0), lines: Number(row.lines ?? 0), amount: string(row.amount), status: string(row.status) };
   }).filter((row) => row.id) : [];
+  const initialError = batchParam
+    ? !validBatchParam || batchResult.error || !batchResult.data
+      ? "Laporan tidak ditemukan atau Anda tidak memiliki akses."
+      : null
+    : null;
 
   return <main className="page-content">
-    <IposSalesImportWorkspace initialBatch={batchResult.error ? null : projectIposSalesBatch(batchResult.data)} recent={recent} />
+    <IposSalesImportWorkspace
+      key={batchParam ?? "upload"}
+      initialBatch={batchResult.error ? null : projectIposSalesBatch(batchResult.data)}
+      initialError={initialError}
+      recent={recent}
+    />
   </main>;
 }

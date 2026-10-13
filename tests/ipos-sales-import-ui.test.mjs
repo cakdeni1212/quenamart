@@ -52,3 +52,21 @@ test("recent list is bounded and page remains usable with responsive stacked car
   assert.match(payload, /sentDuplicateCount < 100/);
   assert.match(payload, /unique_sku_count: uniqueSkuCount/);
 });
+
+test("batch search-param navigation remounts workspace for selection changes and handles inaccessible batches", () => {
+  assert.match(page, /key=\{batchParam \?\? "upload"\}/);
+  assert.match(page, /initialError=\{initialError\}/);
+  assert.match(page, /!validBatchParam \|\| batchResult\.error \|\| !batchResult\.data/);
+  assert.match(workspace, /initialError\?: string \| null/);
+  assert.match(workspace, /useState<string \| null>\(initialError\)/);
+  assert.match(workspace, /href=\{`\/transaksi\/import-ipos\?batch=\$\{encodeURIComponent\(row\.id\)\}`\}/);
+
+  // The key follows the selected query value: upload → A → B → A → upload
+  // creates a new workspace for each navigation, while server actions keep
+  // the same key and therefore preserve their locally refreshed batch state.
+  const workspaceKey = (batch) => batch ?? "upload";
+  assert.notEqual(workspaceKey(undefined), workspaceKey("batch-a"));
+  assert.notEqual(workspaceKey("batch-a"), workspaceKey("batch-b"));
+  assert.equal(workspaceKey("batch-a"), workspaceKey("batch-a"));
+  assert.equal(workspaceKey(undefined), "upload");
+});

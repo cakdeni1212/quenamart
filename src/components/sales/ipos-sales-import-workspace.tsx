@@ -28,9 +28,9 @@ function unwrap(value: unknown): BatchView | null {
   return { batch: record(root.batch), transactions: Array.isArray(root.transactions) ? root.transactions.map(record) : [] };
 }
 
-export function IposSalesImportWorkspace({ initialBatch, recent }: { initialBatch: unknown; recent: RecentRow[] }) {
+export function IposSalesImportWorkspace({ initialBatch, initialError = null, recent }: { initialBatch: unknown; initialError?: string | null; recent: RecentRow[] }) {
   const [batchView, setBatchView] = useState<BatchView | null>(() => unwrap(initialBatch));
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [notice, setNotice] = useState<string | null>(null);
   const [filename, setFilename] = useState("");
   const [duplicateFile, setDuplicateFile] = useState(() => text(unwrap(initialBatch)?.batch.status) === "COMMITTED");
