@@ -4,7 +4,7 @@ import { canAccessSection } from "@/lib/auth/roles";
 import { readPosCartWorkspace } from "@/lib/pos/cart-read";
 import { createPosCart } from "@/app/actions/pos-cart";
 import { PosWorkspace } from "@/components/pos/pos-workspace";
-import { readEffectivePosSettings } from "@/lib/settings/pos";
+import { readEffectivePosSettings } from "@/lib/settings/pos.server";
 
 export default async function KasirPage() {
   const profile = await requireProfile();

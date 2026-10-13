@@ -66,3 +66,25 @@ test("settings defaults keep existing payment, hold, and receipt behavior until 
   assert.match(migration, /coalesce\(s\.receipt_show_phone,true\)/);
   assert.match(migration, /LEFT JOIN public\.outlet_pos_settings s/);
 });
+
+test("POS settings shared definitions stay client-safe and reads stay server-only", async () => {
+  const [shared, server, form, workspace, settingsPage, cashierPage, action] = await Promise.all([
+    read("src/lib/settings/pos-shared.ts"),
+    read("src/lib/settings/pos.server.ts"),
+    read("src/components/settings/pos-settings-form.tsx"),
+    read("src/components/pos/pos-workspace.tsx"),
+    read("app/(workspace)/pengaturan/kasir-penjualan/page.tsx"),
+    read("app/(workspace)/kasir/page.tsx"),
+    read("src/app/actions/pos-settings.ts"),
+  ]);
+  assert.doesNotMatch(shared, /supabase\/server|next\/headers|server-only|createClient/);
+  assert.match(server, /^import "server-only";/);
+  assert.match(server, /@\/lib\/supabase\/server/);
+  assert.match(form, /@\/lib\/settings\/pos-shared/);
+  assert.match(workspace, /@\/lib\/settings\/pos-shared/);
+  assert.doesNotMatch(form, /@\/lib\/settings\/pos\.server|@\/lib\/supabase\/server/);
+  assert.doesNotMatch(workspace, /@\/lib\/settings\/pos\.server|@\/lib\/supabase\/server/);
+  assert.match(settingsPage, /readPosSettings\(\)/);
+  assert.match(cashierPage, /readEffectivePosSettings\(\)/);
+  assert.match(action, /supabase\.rpc\("pos_settings_update"/);
+});

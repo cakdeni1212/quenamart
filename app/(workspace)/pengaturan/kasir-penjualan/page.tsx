@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/session";
-import { readPosSettings } from "@/lib/settings/pos";
+import { readPosSettings } from "@/lib/settings/pos.server";
 import { PosSettingsForm } from "@/components/settings/pos-settings-form";
 import styles from "@/components/settings/settings.module.css";
 

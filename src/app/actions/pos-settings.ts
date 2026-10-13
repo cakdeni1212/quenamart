@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth/session";
-import { POS_PAYMENT_METHODS, type PosPaymentMethod } from "@/lib/settings/pos";
+import { POS_PAYMENT_METHODS, type PosPaymentMethod } from "@/lib/settings/pos-shared";
 import { createClient } from "@/lib/supabase/server";
 
 export type PosSettingsInput = {

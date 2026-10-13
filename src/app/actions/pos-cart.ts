@@ -2,7 +2,7 @@
 
 import { getProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import type { PosPaymentMethod } from "@/lib/settings/pos";
+import type { PosPaymentMethod } from "@/lib/settings/pos-shared";
 
 type PosResult = { ok: true; value: Record<string, unknown> } | { ok: false; code: string; message: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

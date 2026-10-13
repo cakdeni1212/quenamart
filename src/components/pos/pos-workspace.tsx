@@ -6,7 +6,7 @@ import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, checkoutPos, cr
 import { PosReceipt, type PosReceiptData } from "@/components/pos/pos-receipt";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { ceilRupiah, compareRupiah, formatRupiah, subtractRupiah } from "@/lib/money";
-import type { PosPaymentMethod, PosSettings } from "@/lib/settings/pos";
+import type { PosPaymentMethod, PosSettings } from "@/lib/settings/pos-shared";
 
 type Row = Record<string, unknown>;
 type Cart = Row & { id: string; status: string; revision: number; items: Row[] };

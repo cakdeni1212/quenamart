@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updatePosSettings, type PosSettingsInput } from "@/app/actions/pos-settings";
-import { POS_PAYMENT_METHODS, type PosPaymentMethod, type PosSettings } from "@/lib/settings/pos";
+import { POS_PAYMENT_METHODS, type PosPaymentMethod, type PosSettings } from "@/lib/settings/pos-shared";
 import buttons from "@/components/ui/workspace-primary-action.module.css";
 import styles from "@/components/settings/settings.module.css";
 
