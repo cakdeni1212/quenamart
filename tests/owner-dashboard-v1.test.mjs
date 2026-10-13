@@ -66,6 +66,18 @@ test('dashboard renders real data states and navigation without mutation control
   assert.match(css, /@media \(max-width:760px\)/);
 });
 
+test('operating expense metrics reuse the existing responsive KPI card grid', () => {
+  const kpiSection = page.slice(page.indexOf('className={styles.kpis}'), page.indexOf('</section>', page.indexOf('className={styles.kpis}')));
+  assert.match(kpiSection, /className=\{styles\.kpi\}><span>Pengeluaran hari ini<\/span>/);
+  assert.match(kpiSection, /className=\{styles\.kpi\}><span>Laba operasional<\/span>/);
+  assert.match(kpiSection, /href="\/pengeluaran"/);
+  assert.match(kpiSection, /Belum tersedia/);
+  assert.match(css, /\.kpi\s*\{[^}]*padding:16px 17px/);
+  assert.match(css, /\.kpis\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css, /\.kpis\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/);
+  assert.doesNotMatch(page + css, /operatingSummary|operatingUnavailable/);
+});
+
 test('RPC returns no HPP, WAC, source-layer or raw COGS payload', () => {
   const responseShape = migration.slice(migration.indexOf("SELECT jsonb_build_object("), migration.indexOf('ALTER FUNCTION public.owner_dashboard_read'));
   assert.doesNotMatch(responseShape, /'wac'|'current_wac'|'hpp'|'source_layer'|'resolved_cogs'|'inventory_value'/i);

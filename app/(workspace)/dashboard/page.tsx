@@ -42,7 +42,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Link href="/hpp-awal">Lihat persiapan →</Link>
       </aside>}
 
-      <section className={styles.kpis} aria-label="Ringkasan penjualan hari ini">
+      <section className={styles.kpis} aria-label="Ringkasan keuangan hari ini">
         <article className={styles.kpi}><span>Omzet hari ini</span><strong>{salesMoney(data.sales.today_total)}</strong><small>{salesComparisonLabel(data.sales.comparison, data.sales.change_percent)}</small></article>
         <article className={styles.kpi}><span>Transaksi</span><strong>{numberLabel(data.sales.today_count)}</strong><small>transaksi hari ini</small></article>
         <article className={styles.kpi}><span>Rata-rata belanja</span><strong>{salesMoney(data.sales.average_basket)}</strong><small>omzet ÷ transaksi selesai</small></article>
@@ -51,13 +51,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             : data.profit.status === "INCOMPLETE" ? <><strong className={styles.kpiState}>Belum lengkap</strong><small>COGS sebagian belum final</small></>
               : <><strong>{salesMoney(data.profit.gross_profit)}</strong><small>berdasarkan COGS penjualan hari ini</small></>}
         </article>
-      </section>
-
-      <section className={styles.operatingSummary} aria-label="Ringkasan biaya operasional">
-        <div><span>Pengeluaran hari ini</span><strong>{salesMoney(data.expenses.expenses_today)}</strong><Link href="/pengeluaran">Lihat pengeluaran →</Link></div>
-        <div><span>Laba operasional</span>{data.expenses.operating_profit === null
-          ? <><strong className={styles.operatingUnavailable}>Belum tersedia</strong><small>{data.expenses.gross_profit_status === "COSTING_INACTIVE" ? "Costing belum aktif" : "Laba kotor belum lengkap"}</small></>
-          : <><strong>{salesMoney(data.expenses.operating_profit)}</strong><small>Laba kotor − pengeluaran tercatat</small></>}</div>
+        <article className={styles.kpi}><span>Pengeluaran hari ini</span><strong>{salesMoney(data.expenses.expenses_today)}</strong><small><Link className={styles.kpiLink} href="/pengeluaran">Lihat pengeluaran →</Link></small></article>
+        <article className={styles.kpi}><span>Laba operasional</span>{data.expenses.operating_profit === null
+          ? <><strong className={styles.kpiState}>Belum tersedia</strong><small>{data.expenses.gross_profit_status === "COSTING_INACTIVE" ? "Costing belum aktif" : "Laba kotor belum lengkap"}</small></>
+          : <><strong>{salesMoney(data.expenses.operating_profit)}</strong><small>Laba kotor − pengeluaran tercatat</small></>}</article>
       </section>
 
       <section className={styles.mainGrid}>
