@@ -23,6 +23,10 @@ export type PosReceiptData = {
   sale_number: string;
   completed_at: string;
   cashier_label: string;
+  outlet_display_name?: string | null;
+  outlet_address?: string | null;
+  outlet_phone?: string | null;
+  outlet_whatsapp?: string | null;
   items: ReceiptItem[];
   subtotal: number | string;
   discount_total: number | string;
@@ -31,8 +35,10 @@ export type PosReceiptData = {
 };
 
 export function PosReceipt({ receipt, size }: { receipt: PosReceiptData; size: "58" | "80" }) {
+  const outletName = receipt.outlet_display_name?.trim() || "QUENA MART";
+  const contact = receipt.outlet_phone?.trim() || receipt.outlet_whatsapp?.trim();
   return <article className={`pos-receipt pos-receipt-${size}`} data-print-receipt>
-    <header className="pos-receipt-brand"><strong>QUENA MART</strong><small>Belanja kebutuhan harian</small></header>
+    <header className="pos-receipt-brand"><strong>{outletName}</strong>{receipt.outlet_address && <small>{receipt.outlet_address}</small>}{contact && <small>{contact}</small>}</header>
     <div className="pos-receipt-rule" />
     <dl className="pos-receipt-meta">
       <div><dt>No</dt><dd>{receipt.sale_number}</dd></div>
@@ -56,6 +62,6 @@ export function PosReceipt({ receipt, size }: { receipt: PosReceiptData; size: "
       </Fragment>)}
     </div>}
     <div className="pos-receipt-rule" />
-    <footer>Terima kasih<br />Belanja hemat di Quena Mart</footer>
+    <footer>Terima kasih<br />Belanja hemat di {outletName}</footer>
   </article>;
 }

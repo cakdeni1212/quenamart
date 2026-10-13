@@ -7,6 +7,7 @@
 - Server-verified active profile loading and role-aware landing.
 - Protected workspace layout and server section checks.
 - Responsive Quena Mart shell, sidebar, empty-state dashboard, and future metric/chart placeholders.
+- `/pengaturan` provides a concise Settings directory. `/pengaturan/toko-outlet` edits the existing outlet identity; OWNER updates, OWNER/ADMIN read, while future configuration sections are visibly unavailable and do not link to placeholders.
 - Protected `/hpp-awal` Persiapan HPP Awal workspace for OWNER/ADMIN, using Checkpoint A bounded preview, explicit preparation, reasoned exception resolution, and OWNER-only approval. Warnings remain informational; approval does not bootstrap or change stock.
 
 ## Phase 3C.1B Stock workspace
