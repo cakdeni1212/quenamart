@@ -50,6 +50,10 @@ export function Sidebar({ role, name }: { role: UserRole; name: string | null })
                 return <Link key={link.href} href={link.href} className={`nav-item nav-subitem${current ? " nav-active" : ""}`} aria-current={current ? "page" : undefined}>{link.label}</Link>;
               })}
             </div>}
+            {item.label === "Transaksi" && (role === "OWNER" || role === "ADMIN") && <div className="nav-sublist" aria-label="Menu Transaksi">
+              <Link href="/transaksi" className={`nav-item nav-subitem${pathname === "/transaksi" || pathname.startsWith("/transaksi/") && !pathname.startsWith("/transaksi/import-ipos") ? " nav-active" : ""}`} aria-current={pathname === "/transaksi" ? "page" : undefined}>Riwayat Transaksi</Link>
+              <Link href="/transaksi/import-ipos" className={`nav-item nav-subitem${pathname.startsWith("/transaksi/import-ipos") ? " nav-active" : ""}`} aria-current={pathname.startsWith("/transaksi/import-ipos") ? "page" : undefined}>Import Penjualan iPos</Link>
+            </div>}
             {item.label === "Pengaturan" && canAccessSection(role, "akun") && <div className="nav-sublist" aria-label="Menu Pengaturan">
               <Link href="/pengaturan/akun" className={`nav-item nav-subitem${pathname.startsWith("/pengaturan/akun") ? " nav-active" : ""}`} aria-current={pathname.startsWith("/pengaturan/akun") ? "page" : undefined}>Akun &amp; Akses</Link>
             </div>}
