@@ -88,3 +88,24 @@ test("POS settings shared definitions stay client-safe and reads stay server-onl
   assert.match(cashierPage, /readEffectivePosSettings\(\)/);
   assert.match(action, /supabase\.rpc\("pos_settings_update"/);
 });
+
+test("POS setting booleans use accessible Quena switches rather than native checkboxes", async () => {
+  const [form, component, css, settingsCss] = await Promise.all([
+    read("src/components/settings/pos-settings-form.tsx"),
+    read("src/components/ui/quena-switch.tsx"),
+    read("src/components/ui/quena-switch.module.css"),
+    read("src/components/settings/settings.module.css"),
+  ]);
+  assert.equal((form.match(/<QuenaSwitch\b/g) ?? []).length, 5);
+  assert.equal((form.match(/\{ method: "(?:CASH|QRIS|CARD|E_WALLET)", label:/g) ?? []).length, 4);
+  assert.doesNotMatch(form, /type="checkbox"/);
+  assert.match(component, /role="switch"/);
+  assert.match(component, /aria-checked=\{checked\}/);
+  assert.match(component, /aria-label=\{label\}/);
+  assert.match(component, /type="button"/);
+  assert.match(css, /data-state="on"\]\{background:#315d3b\}/);
+  assert.match(css, /transform:translateX\(16px\)/);
+  assert.doesNotMatch(settingsCss, /posSettingRow input\[type=checkbox\]/);
+  assert.match(form, /enabled_payment_methods\.length > 0/);
+  assert.match(form, /disabled=\{pending \|\| !changed \|\| !valid\}/);
+});
