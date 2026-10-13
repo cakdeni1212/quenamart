@@ -45,5 +45,8 @@ export function projectIposSalesBatch(value: unknown) {
       unresolved_details_truncated: unresolvedCount > 500,
     },
     transactions,
+    estimate: root.estimate && typeof root.estimate === "object" && !Array.isArray(root.estimate)
+      ? root.estimate
+      : null,
   };
 }

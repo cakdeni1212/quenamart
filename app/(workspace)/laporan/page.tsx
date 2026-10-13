@@ -72,6 +72,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </article>
       </section>
 
+      {data.ipos_estimated_profit.transactions > 0 && <section className={styles.card}>
+        <div className={styles.cardHead}><div><div className="eyebrow">ESTIMASI · IPOS_IMPORT</div><h2>Estimasi Profit iPos</h2><p>Estimasi dari snapshot biaya saat pemeriksaan; bukan laba akuntansi historis.</p></div></div>
+        <div className={styles.productRows}>
+          <div><div><strong>Omzet iPos</strong><small>{idNumber(data.ipos_estimated_profit.transactions)} transaksi · nilai penjualan aktual</small></div><span><strong>{salesMoney(data.ipos_estimated_profit.revenue)}</strong></span></div>
+          <div><div><strong>Estimasi HPP</strong><small>Untuk omzet tercakup {salesMoney(data.ipos_estimated_profit.coveredRevenue)}</small></div><span><strong>{data.ipos_estimated_profit.estimatedCost === null ? "Belum tersedia" : salesMoney(data.ipos_estimated_profit.estimatedCost)}</strong></span></div>
+          <div><div><strong>Estimasi Profit</strong><small>{new Intl.NumberFormat("id-ID", { maximumFractionDigits:1 }).format(Number(data.ipos_estimated_profit.revenueCoverage))}% omzet tercakup · margin {data.ipos_estimated_profit.estimatedMargin === null ? "Belum tersedia" : `${new Intl.NumberFormat("id-ID", { maximumFractionDigits:2 }).format(Number(data.ipos_estimated_profit.estimatedMargin))}%`}</small></div><span><strong>{data.ipos_estimated_profit.estimatedProfit === null ? "Belum tersedia" : formatReportMoney(data.ipos_estimated_profit.estimatedProfit,salesMoney)}</strong></span></div>
+        </div>
+        <p className={styles.note}>Cakupan berbobot omzet: {salesMoney(data.ipos_estimated_profit.coveredRevenue)} dari {salesMoney(data.ipos_estimated_profit.revenue)}. Sumber biaya saat snapshot — WAC {idNumber(data.ipos_estimated_profit.wacSkuCount)} SKU, HPP referensi {idNumber(data.ipos_estimated_profit.referenceHppSkuCount)} SKU, belum tersedia {idNumber(data.ipos_estimated_profit.unavailableSkuCount)} SKU. Nilai ini tidak mengubah Laba Kotor atau Laba Operasional resmi.</p>
+      </section>}
+
       <section className={styles.analysisGrid}>
         <article className={styles.card}>
           <div className={styles.cardHead}><div><h2>Tren Laba</h2><p>Omzet, laba kotor, dan laba operasional</p></div></div>

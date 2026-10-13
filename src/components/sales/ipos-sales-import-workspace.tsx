@@ -5,11 +5,12 @@ import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { commitIposSales, recheckIposSales, uploadIposSales } from "@/app/actions/ipos-sales-import";
 import { formatRupiah } from "@/lib/money";
 import { formatIposSalesRevenue } from "@/lib/ipos-sales/presentation";
+import { formatReportMoney } from "@/lib/reports/model";
 import buttons from "@/components/ui/workspace-primary-action.module.css";
 import styles from "@/components/sales/ipos-sales-import.module.css";
 
 type Dict = Record<string, unknown>;
-type BatchView = { batch: Dict; transactions: Dict[] };
+type BatchView = { batch: Dict; transactions: Dict[]; estimate: Dict | null };
 type RecentRow = { id: string; reportFrom: string; reportTo: string; filename: string; transactions: number; lines: number; amount: string; status: string };
 const record = (value: unknown): Dict => value && typeof value === "object" && !Array.isArray(value) ? value as Dict : {};
 const text = (value: unknown, fallback = "") => typeof value === "string" ? value : fallback;
@@ -25,7 +26,11 @@ const statusText = (status: string) => ({ READY: "Siap diimport", COMMITTED: "Su
 function unwrap(value: unknown): BatchView | null {
   const root = record(value);
   if (!root.batch || typeof root.batch !== "object") return null;
-  return { batch: record(root.batch), transactions: Array.isArray(root.transactions) ? root.transactions.map(record) : [] };
+  return {
+    batch: record(root.batch),
+    transactions: Array.isArray(root.transactions) ? root.transactions.map(record) : [],
+    estimate: root.estimate && typeof root.estimate === "object" && !Array.isArray(root.estimate) ? record(root.estimate) : null,
+  };
 }
 
 export function IposSalesImportWorkspace({ initialBatch, initialError = null, recent }: { initialBatch: unknown; initialError?: string | null; recent: RecentRow[] }) {
@@ -93,7 +98,7 @@ export function IposSalesImportWorkspace({ initialBatch, initialError = null, re
     startTransition(async () => {
       const result = await commitIposSales(batchId, num(batch?.revision));
       if (result.error) { setError(result.error); return; }
-      setBatchView(unwrap(result.batch) ?? (batch ? { batch: { ...batch, status: "COMMITTED" }, transactions } : null)); setNotice(null);
+      setBatchView(unwrap(result.batch) ?? (batch ? { batch: { ...batch, status: "COMMITTED" }, transactions, estimate: batchView?.estimate ?? null } : null)); setNotice(null);
     });
   }
 
@@ -130,6 +135,8 @@ export function IposSalesImportWorkspace({ initialBatch, initialError = null, re
         {!reconciliationOk && <p className={styles.cardTitle}><span>Total laporan tidak sesuai. Penjualan belum dapat diimport.</span></p>}
       </section>
 
+      <IposEstimateCard estimate={batchView.estimate} />
+
       {(missing.length > 0 || invalid.length > 0 || duplicateTransactions.length > 0 || stockBlockers > 0 || opnameConflicts > 0 || receiptConflicts > 0 || costingBlockers > 0 || !reconciliationOk) && <section className={styles.issues} aria-label="Hal yang perlu diselesaikan">
         <div className={styles.cardTitle}><h2>Perlu Diselesaikan</h2><p>Selesaikan hal berikut sebelum penjualan dapat diimport.</p></div>
         {(missing.length > 0 || invalid.length > 0) && <article className={styles.issue}><h3>{missing.length ? "SKU belum terdaftar" : "SKU perlu diperiksa"} · {num(preflight.missingSkuCount) + num(preflight.ambiguousSkuCount)} produk</h3><p>Produk berikut ada di laporan penjualan, tetapi belum dapat dicocokkan dengan data produk Quena Mart. Upload data produk iPos terbaru, lalu kembali ke halaman ini dan tekan Cek Ulang.</p><div className={styles.issueTable}><table><thead><tr><th>SKU</th><th>Nama Produk dari iPos</th><th>Qty Terjual</th></tr></thead><tbody>{[...unresolvedProducts.values()].slice(0, 30).map((product) => <tr key={product.sku}><td>{product.sku}</td><td>{product.name}</td><td>{formatNumber(product.quantity)}</td></tr>)}</tbody></table></div>{Boolean(batch.unresolved_details_truncated) && <p>Menampilkan sebagian SKU yang perlu diperiksa. Perbarui data produk lalu gunakan Cek Ulang.</p>}<Link className={styles.helpLink} href="/import-ipos">Update Data Produk →</Link></article>}
@@ -152,3 +159,38 @@ export function IposSalesImportWorkspace({ initialBatch, initialError = null, re
 
 function Metric({ label, value, money = false }: { label: string; value: string; money?: boolean }) { return <div className={`${styles.metric}${money ? ` ${styles.money}` : ""}`}><span>{label}</span><strong>{value}</strong></div>; }
 function Issue({ title, children }: { title: string; children: ReactNode }) { return <article className={styles.issue}><h3>{title}</h3>{children}</article>; }
+
+function IposEstimateCard({ estimate }: { estimate: Dict | null }) {
+  const summary = record(estimate?.summary);
+  const sources = record(estimate?.costSources);
+  const uncovered = Array.isArray(estimate?.uncovered) ? estimate.uncovered.map(record) : [];
+  const coverage = Number(summary.revenueCoverage);
+  const money = (value: unknown) => formatReportMoney(typeof value === "string" ? value : null, formatRupiah);
+  const estimateCost = typeof summary.estimatedCost === "string" ? money(summary.estimatedCost) : "Belum tersedia";
+  const estimateProfit = typeof summary.estimatedProfit === "string" ? money(summary.estimatedProfit) : "Belum tersedia";
+  const estimateMargin = typeof summary.estimatedMargin === "string"
+    ? `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(Number(summary.estimatedMargin))}%`
+    : "Belum tersedia";
+  return <section className={`${styles.card} ${styles.estimate}`} aria-label="Estimasi profit iPos">
+    <div className={styles.cardTitle}><div className="eyebrow">ESTIMASI · INFORMASI</div><h2>Estimasi Profit iPos</h2>
+      <p>Estimasi memakai referensi biaya Quena saat pemeriksaan. Ini bukan laba akuntansi historis dan tidak mengubah kesiapan import.</p>
+    </div>
+    {!estimate ? <p className={styles.estimateEmpty}>Estimasi belum dihitung. Tekan Cek Ulang untuk menghitungnya dari data biaya yang tersedia.</p> : <>
+      <div className={styles.estimateMeta}>Dihitung pada {dateLabel(text(estimate.calculatedAt))}{estimate.frozen === true ? " · dibekukan saat import" : " · dapat berubah pada Cek Ulang"}</div>
+      <div className={styles.estimateGrid}>
+        <Metric label="Estimasi HPP · bagian tercakup" value={estimateCost} money />
+        <Metric label={coverage < 100 ? `Estimasi Profit · ${Number.isFinite(coverage) ? new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(coverage) : "0"}% omzet tercakup` : "Estimasi Profit"} value={estimateProfit} money />
+        <Metric label="Estimasi Margin · bagian tercakup" value={estimateMargin} />
+        <Metric label="Cakupan Estimasi" value={`${Number.isFinite(coverage) ? new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(coverage) : "0"}% dari omzet`} />
+      </div>
+      <div className={styles.estimateCoverage}>Omzet laporan <strong>{money(summary.reportRevenue)}</strong><span>Omzet tercakup <strong>{money(summary.coveredRevenue)}</strong></span><span>Omzet tanpa estimasi <strong>{money(summary.uncoveredRevenue)}</strong></span></div>
+      <p className={styles.estimateNote}>Estimasi profit hanya mencakup omzet yang memiliki referensi biaya. Perhitungan ini bukan COGS historis.</p>
+      <div className={styles.estimateSources}><span>WAC: {num(sources.wacSkuCount)} SKU</span><span>HPP Referensi: {num(sources.referenceHppSkuCount)} SKU</span><span>Belum tersedia: {num(sources.unavailableSkuCount)} SKU</span></div>
+      {num(summary.uncoveredSku) > 0 && <>
+        <p className={styles.estimateUncovered}>{num(summary.uncoveredSku)} SKU belum memiliki data biaya yang dapat digunakan.</p>
+        {uncovered.length > 0 && <div className={styles.issueTable}><table><thead><tr><th>SKU</th><th>Nama</th><th>Qty</th><th>Omzet</th><th>Alasan</th></tr></thead><tbody>{uncovered.map((row, index) => <tr key={`${text(row.sku)}-${index}`}><td>{text(row.sku)}</td><td>{text(row.name)}</td><td>{formatNumber(row.quantity)}</td><td>{money(row.revenue)}</td><td>{text(row.reason)}</td></tr>)}</tbody></table></div>}
+        {estimate.uncoveredTruncated === true && <small>Menampilkan sebagian SKU yang belum memiliki estimasi.</small>}
+      </>}
+    </>}
+  </section>;
+}

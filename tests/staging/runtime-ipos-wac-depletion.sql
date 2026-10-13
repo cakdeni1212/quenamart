@@ -29,7 +29,7 @@ DECLARE
   stock_before numeric; stock_after numeric; valued_before numeric; valued_after numeric;
   unvalued_before numeric; unvalued_after numeric; value_before numeric; value_after numeric;
   wac_before numeric; wac_after numeric; period_id uuid; tx_number text; result jsonb; replay jsonb;
-  pooled_after_value numeric;pooled_after_wac numeric;
+  pooled_after_value numeric;pooled_after_wac numeric;revision_no integer;
   report jsonb; dash jsonb; movement_id uuid; v_sale_id uuid; event_count bigint;
 BEGIN
   SELECT id INTO STRICT o FROM public.outlets WHERE code='QUENA-MART-1';
@@ -62,7 +62,10 @@ BEGIN
   SELECT l,b,t,2,pr.sku,pr.name,0.125,pr.unit_label,120,0,15,'{}','MATCHED',pr.id
     FROM public.products pr WHERE pr.id=v_product_id;
 
-  result:=public.ipos_sales_import_commit(b,1,request_id);
+  result:=public.ipos_sales_import_recheck(b,gen_random_uuid());
+  IF result->>'status'<>'READY' THEN RAISE EXCEPTION 'WAC import fixture did not recheck READY: %',result; END IF;
+  SELECT revision INTO STRICT revision_no FROM public.ipos_sales_import_batches WHERE id=b;
+  result:=public.ipos_sales_import_commit(b,revision_no,request_id);
   SELECT s.id INTO STRICT v_sale_id FROM public.sales s WHERE s.source_import_batch_id=b;
   SELECT m.id INTO STRICT movement_id FROM public.stock_movements m WHERE m.ipos_sales_import_line_id=l;
   SELECT s.effective_quantity,c.valued_quantity,c.unvalued_quantity,c.inventory_value,c.current_wac
@@ -94,7 +97,7 @@ BEGIN
     (SELECT count(*) FROM public.inventory_cost_events e WHERE e.source_entity_type='IPOS_IMPORT_INVENTORY_DEPLETION' AND e.source_entity_id=l)<>1 THEN
     RAISE EXCEPTION 'Cost writer replay was not idempotent';
   END IF;
-  IF public.ipos_sales_import_commit(b,1,request_id) IS DISTINCT FROM result THEN
+  IF public.ipos_sales_import_commit(b,revision_no,request_id) IS DISTINCT FROM result THEN
     RAISE EXCEPTION 'Import commit replay did not return the stored result';
   END IF;
   report:=public.owner_reports_read(timezone('Asia/Jakarta',now())::date,timezone('Asia/Jakarta',now())::date,
@@ -121,7 +124,10 @@ BEGIN
     raw_unit,raw_unit_price,raw_discount_percent,raw_line_total,raw_data,resolution,product_id)
   SELECT l2,b2,t2,2,pr.sku,pr.name,0.5,pr.unit_label,10,0,5,'{}','MATCHED',pr.id
     FROM public.products pr WHERE pr.id=v_product2;
-  PERFORM public.ipos_sales_import_commit(b2,1,request2);
+  result:=public.ipos_sales_import_recheck(b2,gen_random_uuid());
+  IF result->>'status'<>'READY' THEN RAISE EXCEPTION 'Unvalued import fixture did not recheck READY: %',result; END IF;
+  SELECT revision INTO STRICT revision_no FROM public.ipos_sales_import_batches WHERE id=b2;
+  PERFORM public.ipos_sales_import_commit(b2,revision_no,request2);
   SELECT s.id INTO STRICT v_sale2 FROM public.sales s WHERE s.source_import_batch_id=b2;
   SELECT s.effective_quantity,c.valued_quantity,c.unvalued_quantity,c.inventory_value,c.current_wac
     INTO STRICT stock_after,valued_after,unvalued_after,value_after,wac_after
@@ -150,6 +156,7 @@ DECLARE
   a uuid:='a0000000-0000-4000-8000-000000000001';o uuid; p1 uuid;p2 uuid;b uuid:=gen_random_uuid();
   t uuid:=gen_random_uuid();l1 uuid:=gen_random_uuid();l2 uuid:=gen_random_uuid();request_id uuid:=gen_random_uuid();
   r1 numeric;r2 numeric;c1 numeric;c2 numeric;v1 numeric;v2 numeric;u1 numeric;u2 numeric;error_code text;tx_number text;
+  result jsonb;revision_no integer;
 BEGIN
   SELECT id INTO STRICT o FROM public.outlets WHERE code='QUENA-MART-1';
   SELECT id INTO STRICT p1 FROM public.products WHERE sku='CUTOVER-MULTI';
@@ -178,9 +185,12 @@ BEGIN
   SELECT l1,b,t,2,p.sku,p.name,0.125,p.unit_label,100,0,12.5,'{}'::jsonb,'MATCHED',p.id FROM public.products p WHERE p.id=p1
   UNION ALL
   SELECT l2,b,t,3,p.sku,p.name,0.1,p.unit_label,100,0,10,'{}'::jsonb,'MATCHED',p.id FROM public.products p WHERE p.id=p2;
+  result:=public.ipos_sales_import_recheck(b,gen_random_uuid());
+  IF result->>'status'<>'READY' THEN RAISE EXCEPTION 'Rollback import fixture did not recheck READY: %',result; END IF;
+  SELECT revision INTO STRICT revision_no FROM public.ipos_sales_import_batches WHERE id=b;
   PERFORM set_config('quena.c1_fail_product',p2::text,true);
   BEGIN
-    PERFORM public.ipos_sales_import_commit(b,1,request_id);
+    PERFORM public.ipos_sales_import_commit(b,revision_no,request_id);
     RAISE EXCEPTION 'Rollback test failed: import commit unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS error_code=MESSAGE_TEXT;
