@@ -7,6 +7,7 @@ const actions = readFileSync(new URL("../src/app/actions/ipos-sales-import.ts", 
 const workspace = readFileSync(new URL("../src/components/sales/ipos-sales-import-workspace.tsx", import.meta.url), "utf8");
 const sidebar = readFileSync(new URL("../src/components/app/sidebar.tsx", import.meta.url), "utf8");
 const payload = readFileSync(new URL("../src/lib/ipos-sales/ui-payload.ts", import.meta.url), "utf8");
+const validation = readFileSync(new URL("../src/lib/ipos-sales/upload-validation.ts", import.meta.url), "utf8");
 
 test("iPos sales import route and every server operation restrict access to OWNER/ADMIN", () => {
   assert.match(page, /profile\.role !== "OWNER" && profile\.role !== "ADMIN"/);
@@ -17,8 +18,9 @@ test("iPos sales import route and every server operation restrict access to OWNE
 });
 
 test("upload validates supported workbook, parses and hashes it on server, then persists before explicit commit", () => {
-  assert.match(actions, /\(xls\|xlsx\)/);
+  assert.match(validation, /\(xls\|xlsx\)/);
   assert.match(actions, /parseIposSalesWorkbook/);
+  assert.match(actions, /validateIposSalesUpload\(entry\.name, entry\.size\)/);
   assert.match(actions, /createHash\("sha256"\)/);
   assert.match(actions, /createAdminClient\(\)/);
   assert.match(actions, /ipos_sales_import_upload/);

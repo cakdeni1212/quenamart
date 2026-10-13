@@ -7,9 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth/session";
 import { parseIposSalesWorkbook } from "@/lib/ipos-sales/parser";
 import { projectIposSalesBatch } from "@/lib/ipos-sales/ui-payload";
+import { validateIposSalesUpload } from "@/lib/ipos-sales/upload-validation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_BYTES = 25 * 1024 * 1024;
 type Json = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Json { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
@@ -39,9 +39,9 @@ export async function uploadIposSales(formData: FormData) {
   const profile = await permitted();
   if (!profile) return { error: "Hanya OWNER atau ADMIN yang dapat mengelola import penjualan iPos." };
   const entry = formData.get("file");
-  if (!(entry instanceof File) || entry.size === 0) return { error: "Pilih file laporan Penjualan Detail iPos terlebih dahulu." };
-  if (!/\.(xls|xlsx)$/i.test(entry.name)) return { error: "Format file belum didukung. Pilih file .xls atau .xlsx." };
-  if (entry.size > MAX_BYTES) return { error: "Ukuran file maksimal 25 MB." };
+  if (!(entry instanceof File)) return { error: "Pilih file laporan Penjualan Detail iPos terlebih dahulu." };
+  const validationError = validateIposSalesUpload(entry.name, entry.size);
+  if (validationError) return { error: validationError };
   const filename = entry.name.split(/[\\/]/).pop()?.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 240) || "laporan-ipos.xls";
   let bytes: Uint8Array;
   let parsed;
