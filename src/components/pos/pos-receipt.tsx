@@ -27,6 +27,7 @@ export type PosReceiptData = {
   outlet_address?: string | null;
   outlet_phone?: string | null;
   outlet_whatsapp?: string | null;
+  receipt_footer_note?: string | null;
   items: ReceiptItem[];
   subtotal: number | string;
   discount_total: number | string;
@@ -62,6 +63,6 @@ export function PosReceipt({ receipt, size }: { receipt: PosReceiptData; size: "
       </Fragment>)}
     </div>}
     <div className="pos-receipt-rule" />
-    <footer>Terima kasih<br />Belanja hemat di {outletName}</footer>
+    <footer>Terima kasih<br />Belanja hemat di {outletName}{receipt.receipt_footer_note?.trim() && <><br />{receipt.receipt_footer_note.trim()}</>}</footer>
   </article>;
 }

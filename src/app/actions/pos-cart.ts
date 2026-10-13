@@ -2,6 +2,7 @@
 
 import { getProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import type { PosPaymentMethod } from "@/lib/settings/pos";
 
 type PosResult = { ok: true; value: Record<string, unknown> } | { ok: false; code: string; message: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -45,6 +46,8 @@ function messageFor(code: string): string {
     POS_CART_NOT_ACTIVE: "Transaksi tidak aktif. Muat ulang keranjang.",
     POS_CART_EMPTY: "Tambahkan barang sebelum melanjutkan pembayaran.",
     POS_PAYMENT_INVALID: "Pembayaran tidak valid. Periksa jumlah uang yang diterima.",
+    POS_PAYMENT_METHOD_DISABLED: "Metode pembayaran ini baru saja dinonaktifkan. Muat ulang kasir lalu pilih metode lain.",
+    POS_HOLD_DISABLED: "Hold transaksi baru saja dinonaktifkan. Keranjang tetap tersimpan dan dapat dilanjutkan atau dibatalkan.",
     POS_CHECKOUT_CONFLICT: "Permintaan pembayaran berbeda dari transaksi sebelumnya. Muat ulang data.",
     POS_UNAUTHORIZED: "Transaksi tidak dapat diakses oleh akun ini.",
     BARCODE_NOT_FOUND: "Barcode belum terdaftar.",
@@ -138,7 +141,7 @@ export async function checkoutPos(input: {
   requestId: string;
   cartId: string;
   expectedRevision: number;
-  method: "CASH" | "QRIS" | "CARD" | "E_WALLET";
+  method: PosPaymentMethod;
   cashReceivedAmount?: string;
   referenceText?: string;
 }): Promise<PosResult> {

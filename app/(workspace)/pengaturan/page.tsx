@@ -4,7 +4,6 @@ import { requireProfile } from "@/lib/auth/session";
 import styles from "@/components/settings/settings.module.css";
 
 const futureSections = [
-  ["Kasir & Penjualan", "Metode pembayaran dan konfigurasi POS."],
   ["Member & Poin", "Aturan loyalty dan reward."],
   ["Keuangan", "Pengaturan operasional keuangan."],
   ["Sistem", "Informasi aplikasi dan konfigurasi sistem."],
@@ -21,6 +20,10 @@ export default async function SettingsPage() {
     <nav className={styles.directory} aria-label="Bagian Pengaturan">
       <Link className={styles.directoryRow} href="/pengaturan/toko-outlet">
         <span className={styles.directoryCopy}><strong>Toko &amp; Outlet</strong><span>Identitas dan informasi outlet.</span></span>
+        <span className={styles.directoryAction}><span>Aktif</span><span aria-hidden="true">›</span></span>
+      </Link>
+      <Link className={styles.directoryRow} href="/pengaturan/kasir-penjualan">
+        <span className={styles.directoryCopy}><strong>Kasir &amp; Penjualan</strong><span>Atur perilaku kasir dan tampilan struk.</span></span>
         <span className={styles.directoryAction}><span>Aktif</span><span aria-hidden="true">›</span></span>
       </Link>
       {profile.role === "OWNER" ? <Link className={styles.directoryRow} href="/pengaturan/akun">
