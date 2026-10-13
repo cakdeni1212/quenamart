@@ -39,6 +39,7 @@ done
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-costing-controls.sql"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-activation-precheck.sql"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-operational-expenses-pre-wac.sql"
+"${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-owner-reports-pre-wac.sql"
 
 first_log="$(mktemp)"
 second_log="$(mktemp)"
@@ -68,4 +69,5 @@ echo "Two-session activation race: exactly one WAC_ACTIVE transition persisted."
 
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-pos-e2e.sql"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-operational-expenses-post-wac.sql"
+"${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-owner-reports.sql"
 echo "GO-LIVE COSTING CONTROLS POSTGRESQL 15 STAGING PASS"
