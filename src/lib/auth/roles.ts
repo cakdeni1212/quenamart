@@ -37,7 +37,7 @@ const sectionAccess: Record<AppSection, readonly UserRole[]> = {
   pembelian: ["OWNER", "ADMIN", "GUDANG"],
   expenses: ["OWNER", "ADMIN"],
   "tempo-supplier": ["OWNER", "ADMIN"],
-  member: ["OWNER", "ADMIN", "KASIR"],
+  member: ["OWNER", "ADMIN"],
   laporan: ["OWNER", "ADMIN"],
   pengaturan: ["OWNER", "ADMIN"],
   akun: ["OWNER"],

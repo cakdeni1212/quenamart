@@ -50,6 +50,8 @@ function messageFor(code: string): string {
     POS_HOLD_DISABLED: "Hold transaksi baru saja dinonaktifkan. Keranjang tetap tersimpan dan dapat dilanjutkan atau dibatalkan.",
     POS_CHECKOUT_CONFLICT: "Permintaan pembayaran berbeda dari transaksi sebelumnya. Muat ulang data.",
     POS_UNAUTHORIZED: "Transaksi tidak dapat diakses oleh akun ini.",
+    POS_MEMBER_INACTIVE_OR_NOT_FOUND: "Member sudah tidak aktif atau tidak ditemukan. Hapus pilihan member sebelum membayar.",
+    MEMBER_POS_REQUEST_REUSED: "Permintaan perubahan member dipakai untuk data yang berbeda. Muat ulang transaksi.",
     BARCODE_NOT_FOUND: "Barcode belum terdaftar.",
     BARCODE_AMBIGUOUS: "Barcode cocok dengan beberapa barang. Cari barang secara manual.",
   };
@@ -67,7 +69,7 @@ async function invoke(name: string, args: Record<string, unknown>): Promise<PosR
   if (!context) return { ok: false, code: "FORBIDDEN", message: messageFor("POS_CART_ACCESS_DENIED") };
   const { data, error } = await context.supabase.rpc(name, args);
   if (error) {
-    const code = error.message?.match(/POS_[A-Z_]+|BARCODE_[A-Z_]+/)?.[0] ?? "POS_REQUEST_FAILED";
+    const code = error.message?.match(/POS_[A-Z_]+|BARCODE_[A-Z_]+|MEMBER_[A-Z_]+/)?.[0] ?? "POS_REQUEST_FAILED";
     return { ok: false, code, message: messageFor(code) };
   }
   if (!record(data)) return { ok: false, code: "INVALID_RESPONSE", message: "Respons POS belum dapat dibaca. Muat ulang." };
@@ -117,6 +119,17 @@ async function transitionPosCart(operation: "park" | "resume" | "cancel", cartId
 export async function parkPosCart(cartId: string, expectedRevision: number, requestId: string) { return transitionPosCart("park", cartId, expectedRevision, requestId); }
 export async function resumePosCart(cartId: string, expectedRevision: number, requestId: string) { return transitionPosCart("resume", cartId, expectedRevision, requestId); }
 export async function cancelPosCart(cartId: string, expectedRevision: number, requestId: string) { return transitionPosCart("cancel", cartId, expectedRevision, requestId); }
+
+export async function searchPosMembers(search: string): Promise<PosResult> {
+  if (search.trim().length < 2 || search.length > 80) return { ok: true, value: { rows: [] } };
+  return invoke("member_pos_search", { p_search: search.trim(), p_limit: 10 });
+}
+
+export async function setPosCartMember(cartId: string, memberId: string | null, revision: number, requestId: string): Promise<PosResult> {
+  if (!validUuid(cartId) || (memberId !== null && !validUuid(memberId)) || !validUuid(requestId)
+      || !Number.isSafeInteger(revision) || revision < 1) return { ok: false, code: "INVALID_INPUT", message: "Data member atau transaksi tidak valid." };
+  return invoke("pos_cart_member_set", { p_cart: cartId, p_member: memberId, p_expected_revision: revision, p_request: requestId });
+}
 
 export async function resolvePosBarcode(barcode: string): Promise<PosResult> {
   if (typeof barcode !== "string" || barcode.trim().length === 0 || barcode.trim().length > 128 || /[\u0000-\u001f\u007f]/.test(barcode)) {

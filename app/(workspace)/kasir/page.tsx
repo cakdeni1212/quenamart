@@ -5,6 +5,7 @@ import { readPosCartWorkspace } from "@/lib/pos/cart-read";
 import { createPosCart } from "@/app/actions/pos-cart";
 import { PosWorkspace } from "@/components/pos/pos-workspace";
 import { readEffectivePosSettings } from "@/lib/settings/pos.server";
+import { readPosCartMember } from "@/lib/members/read.server";
 
 export default async function KasirPage() {
   const profile = await requireProfile();
@@ -19,8 +20,11 @@ export default async function KasirPage() {
     else initialError = created.message;
   }
 
+  const activeCart = workspace.carts.find((cart) => cart.status === "ACTIVE");
+  const initialMember = activeCart ? await readPosCartMember(String(activeCart.id)) : null;
+
   return <main className="page-content pos-page">
     <header className="pos-page-heading"><div><div className="eyebrow">KASIR</div><h1>Kasir</h1></div><p>Scan barcode atau cari produk untuk mulai transaksi.</p></header>
-    <PosWorkspace initialCarts={workspace.carts} initialError={initialError} settings={posSettings} />
+    <PosWorkspace key={`${activeCart?.id ?? "no-cart"}:${initialMember?.id ?? "no-member"}`} initialCarts={workspace.carts} initialError={initialError} settings={posSettings} initialMember={initialMember} />
   </main>;
 }

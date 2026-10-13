@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, checkoutPos, createPosCart, ensureActivePosCart, parkPosCart, readPosSaleReceipt, resolvePosBarcode, resumePosCart, searchPosProducts, setPosCartItemQuantity } from "@/app/actions/pos-cart";
+import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, checkoutPos, createPosCart, ensureActivePosCart, parkPosCart, readPosSaleReceipt, resolvePosBarcode, resumePosCart, searchPosMembers, searchPosProducts, setPosCartItemQuantity, setPosCartMember } from "@/app/actions/pos-cart";
 import { PosReceipt, type PosReceiptData } from "@/components/pos/pos-receipt";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { ceilRupiah, compareRupiah, formatRupiah, subtractRupiah } from "@/lib/money";
 import type { PosPaymentMethod, PosSettings } from "@/lib/settings/pos-shared";
+import memberStyles from "./pos-member.module.css";
 
 type Row = Record<string, unknown>;
 type Cart = Row & { id: string; status: string; revision: number; items: Row[] };
@@ -20,11 +21,14 @@ const paymentOptions: { method: PosPaymentMethod; label: string }[] = [
   { method: "CARD", label: "Kartu" }, { method: "E_WALLET", label: "E-Wallet" },
 ];
 
-export function PosWorkspace({ initialCarts, initialError, settings }: { initialCarts: Row[]; initialError: string | null; settings: Omit<PosSettings, "outlet_id"> }) {
+export function PosWorkspace({ initialCarts, initialError, settings, initialMember }: { initialCarts: Row[]; initialError: string | null; settings: Omit<PosSettings, "outlet_id">; initialMember: Row | null }) {
   const router = useRouter();
   const carts = initialCarts.map(asCart);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Row[]>([]);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberResults, setMemberResults] = useState<Row[]>([]);
+  const [selectedMember, setSelectedMember] = useState<Row | null>(initialMember);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(initialError ?? "");
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -37,6 +41,7 @@ export function PosWorkspace({ initialCarts, initialError, settings }: { initial
   const checkoutRequestId = useRef<string | null>(null);
   const checkoutInFlight = useRef(false);
   const searchSequence = useRef(0);
+  const memberSearchSequence = useRef(0);
   const cart = carts.find((x) => x.status === "ACTIVE");
   const parked = carts.filter((x) => x.status === "PARKED");
   const total = String(cart?.observed_total ?? "0");
@@ -66,6 +71,26 @@ export function PosWorkspace({ initialCarts, initialError, settings }: { initial
     }, 230);
     return () => window.clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => {
+    const sequence = ++memberSearchSequence.current;
+    if (memberQuery.trim().length < 2) return;
+    const timer = window.setTimeout(async () => {
+      const result = await searchPosMembers(memberQuery);
+      if (sequence !== memberSearchSequence.current) return;
+      if (result.ok) setMemberResults(Array.isArray(result.value.rows) ? result.value.rows as Row[] : []);
+      else setNotice(result.message);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [memberQuery]);
+
+  const chooseMember = async (candidate: Row | null) => {
+    if (!cart || busy) return;
+    setBusy(true);
+    const result = await setPosCartMember(cart.id, candidate ? String(candidate.id) : null, cart.revision, uuid());
+    if (!result.ok) { setBusy(false); setNotice(result.message); reload(); return; }
+    setSelectedMember(candidate); setMemberQuery(""); setMemberResults([]); setNotice(""); setBusy(false); reload();
+  };
 
   const add = async (productId: string, scannerAlreadyBusy = false) => {
     if (!cart || (busy && !scannerAlreadyBusy)) return;
@@ -183,6 +208,11 @@ export function PosWorkspace({ initialCarts, initialError, settings }: { initial
 
   return <div className="pos-workspace">
     <section className="pos-entry surface-card" aria-label="Cari dan masukkan produk">
+      <div className={memberStyles.panel}>
+        <label htmlFor="pos-member-query">Member (opsional)</label>
+        {selectedMember ? <div className={memberStyles.selected}><span><strong>{text(selectedMember.full_name)}</strong><small>{text(selectedMember.member_number)} · Poin {Number(selectedMember.point_balance ?? 0).toLocaleString("id-ID")}</small></span><button type="button" disabled={busy || !cart} onClick={() => void chooseMember(null)}>Hapus</button></div> : <input id="pos-member-query" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="Cari nomor HP, ID Member, atau scan kode" autoComplete="off" disabled={!cart || busy} />}
+        {memberQuery.trim().length >= 2 && memberResults.length > 0 && <div className={memberStyles.results} role="group" aria-label="Hasil pencarian member">{memberResults.map((candidate) => <button type="button" key={String(candidate.id)} disabled={busy} onClick={() => void chooseMember(candidate)}><strong>{text(candidate.full_name)}</strong><small>{text(candidate.member_number)} · {text(candidate.phone)}</small></button>)}</div>}
+      </div>
       <div className="pos-section-head"><div><span className="eyebrow">INPUT BARANG</span><h2>Scan atau cari produk</h2></div><span className="pos-live-dot">Siap scan</span></div>
       <label className="pos-search-label" htmlFor="pos-product-query">Barcode, nama produk, atau SKU</label>
       <div className="pos-search-box"><span aria-hidden="true">⌕</span><input id="pos-product-query" ref={input} autoFocus value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void scan(); } if (event.key === "Escape") setResults([]); }} placeholder="Scan barcode lalu tekan Enter" autoComplete="off" /><kbd>ENTER</kbd></div>

@@ -288,3 +288,18 @@ unavailable. Account V1 uses one Supabase Auth identity linked to
 individually. No outlet-membership table exists yet, so the current access
 context is single-outlet. Future Android clients should authenticate the same
 user UUID and use the same profile/role guards.
+
+### Member Core V1
+
+Migration `20260929476000_member_core_v1.sql` adds an outlet-scoped customer
+identity, generated immutable `QMEM-########` number, opaque lookup token,
+normalized-phone uniqueness for active members, append-only member audit and
+point-ledger evidence, and a nullable canonical Member reference on POS carts
+and sales. It does not add earning or redemption rules. Member list/detail
+metrics derive from completed native Quena sales; IPOS_IMPORT remains
+unassigned. OWNER/ADMIN use the bounded management reads and mutations. KASIR
+can use only the limited active-member POS lookup/association contract;
+GUDANG has no access. Checkout locks and revalidates the selected Member before
+sale evidence is written, so deactivation cannot create a partial sale. Direct
+table DML is revoked. See `docs/LOYALTY.md` for implemented and deferred policy
+scope.
