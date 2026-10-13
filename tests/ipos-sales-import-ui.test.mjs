@@ -37,6 +37,8 @@ test("workspace presents review, blocker resolution, explicit confirmation, and 
   assert.match(workspace, /disabled={!isReady \|\| busy}/);
   assert.match(workspace, /href="\/import-ipos"/);
   assert.match(workspace, /href="\/pembelian\/barang-masuk"/);
+  assert.match(workspace, /formatIposSalesRevenue\(batch\.total_amount\)/);
+  assert.doesNotMatch(workspace, /formatRupiah\(text\(batch\.total_amount, "0"\)\)/);
   assert.doesNotMatch(workspace, /SHA-256|source layer|WAC writer|request ID|raw SQL/i);
 });
 
