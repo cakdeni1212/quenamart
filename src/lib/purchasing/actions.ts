@@ -34,17 +34,19 @@ export async function saveSupplier(_previous: ActionState, formData: FormData): 
   const displayName = formData.get("display_name");
   if (typeof displayName !== "string" || !displayName.trim()) return { error: "Nama supplier wajib diisi." };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("purchase_supplier_upsert", {
+  const { error } = await supabase.rpc("supplier_workspace_upsert", {
     p_supplier_id: supplierId,
     p_display_name: displayName.trim(),
-    p_legal_name: optionalText(formData.get("legal_name")),
     p_phone: optionalText(formData.get("phone")),
     p_contact_name: optionalText(formData.get("contact_name")),
+    p_address: optionalText(formData.get("address")),
+    p_notes: optionalText(formData.get("notes")),
     p_is_active: formData.getAll("is_active").includes("true"),
   });
   if (error) return { error: safeMessage(error) };
   revalidatePath("/pembelian/supplier");
   revalidatePath("/pembelian/barang-masuk");
+  if (supplierId) revalidatePath(`/pembelian/supplier/${supplierId}`);
   return { error: null, success: "Data supplier tersimpan." };
 }
 

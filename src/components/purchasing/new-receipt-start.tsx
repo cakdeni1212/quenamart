@@ -1,18 +1,24 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Supplier } from "@/lib/purchasing/receipt-read";
 import { createReceiptDraftForSupplier } from "@/lib/purchasing/actions";
 
-export function NewReceiptStart({ suppliers, actorName }: { suppliers: Supplier[]; actorName: string }) {
+export function NewReceiptStart({ suppliers, actorName, preselectedSupplierId = "" }: { suppliers: Supplier[]; actorName: string; preselectedSupplierId?: string }) {
   const router = useRouter();
   const requestLock = useRef(false);
   const [pending, startTransition] = useTransition();
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState(false);
+
+  useEffect(() => {
+    if (preselectedSupplierId && suppliers.some((supplier) => supplier.id === preselectedSupplierId)) selectSupplier(preselectedSupplierId);
+    // Run only once for a validated query preselection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedSupplierId]);
 
   function selectSupplier(supplierId: string) {
     setSelectedSupplier(supplierId);

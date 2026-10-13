@@ -13,6 +13,7 @@ export default async function NewReceiptPage({ searchParams }: { searchParams: P
   if (!canAccessSection(profile.role,"pembelian")) redirect("/dashboard");
   const params = await searchParams;
   const requestedReceipt = typeof params.receipt === "string" ? params.receipt : "";
+  const requestedSupplier = typeof params.supplier === "string" ? params.supplier : "";
 
   if (requestedReceipt) {
     if (!isUuid(requestedReceipt)) notFound();
@@ -30,6 +31,6 @@ export default async function NewReceiptPage({ searchParams }: { searchParams: P
   const suppliers = await readSuppliers(profile,false);
   const actorName = profile.full_name?.trim() || "Pengguna aktif";
   return <main className="page-content purchasing-page"><Link className="purchase-back" href="/pembelian/barang-masuk">← Barang masuk</Link><div className="eyebrow">PEMBELIAN · PENERIMAAN BARU</div><div className="page-heading"><div><h1>Barang Masuk Baru</h1><p>Pilih supplier untuk langsung membuka formulir penerimaan dan pemindaian barang.</p></div></div>
-    {suppliers.length === 0 ? <div className="surface-card purchase-empty">Belum ada supplier aktif. Minta OWNER atau ADMIN menambahkan supplier terlebih dahulu.</div> : <NewReceiptStart suppliers={suppliers} actorName={actorName}/>}
+    {suppliers.length === 0 ? <div className="surface-card purchase-empty">Belum ada supplier aktif. Minta OWNER atau ADMIN menambahkan supplier terlebih dahulu.</div> : <NewReceiptStart suppliers={suppliers} actorName={actorName} preselectedSupplierId={requestedSupplier}/>}
   </main>;
 }
