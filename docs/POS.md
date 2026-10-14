@@ -51,3 +51,32 @@ History rows and detail use sale-time snapshots and payment evidence; details an
 `/pengaturan/kasir-penjualan` manages outlet-scoped receipt presentation, supported checkout methods, whether new carts may be held, and whether the cashier confirms before cancelling an ACTIVE/PARKED cart. Defaults are read from the existing behavior when no settings row exists: all native methods (`CASH`, `QRIS`, `CARD`, `E_WALLET`), address/phone display, hold, and cancellation confirmation remain enabled; the optional footer note is blank. Transfer Bank is not offered because the checkout payment enum does not support it. Active-cart limits and separate completed-sale void controls remain deferred.
 
 OWNER can update settings; OWNER/ADMIN can read the management view. POS uses a separate effective-settings RPC for OWNER/ADMIN/KASIR, while GUDANG cannot read it. New payment evidence is checked by a database trigger under the same outlet advisory lock as settings changes, so a stale cashier screen cannot submit a method after it is disabled; existing sale/payment history is untouched. A database guard blocks only new PARKED transitions when hold is disabled, leaving already held carts available to resume or cancel. Receipt footer/address/phone are current presentation settings and do not alter sale, payment, stock, or costing evidence. Migration `20260929475000_pos_settings_v1.sql` records OWNER changes in the existing outlet settings event stream.
+
+## Member & Poin V1
+
+`/pengaturan/member-poin` controls an outlet-scoped loyalty policy. Both the
+program and redemption default OFF, preserving current Member behavior until
+an OWNER explicitly enables and saves the policy. POS reads only the bounded
+effective policy needed for the selected Member; checkout remains authoritative.
+
+Checkout applies redemption before earning. For a Rp150.000 merchandise
+subtotal and Rp20.000 point discount, the earn basis is Rp130.000 payable.
+The configured integer threshold determines `floor(payable / threshold)`;
+rates and minimum redemption are settings, not code constants. The existing
+POS amount model has no separate tax, shipping, service, or transaction
+discount fields.
+
+Checkout rechecks active Member status, balance, policy revision, minimum,
+redemption value, and payable amount before any sale or stock evidence is
+written. Payment must equal final payable; point value cannot exceed the
+merchandise amount and does not create cash change. A successful checkout
+appends negative `SALE_REDEEM` and positive `SALE_EARN` events in the same
+transaction as sale/payment/stock/COGS. Earning follows redemption and uses
+the remaining payable. Retry returns the stored checkout result and cannot
+append a second event. Ledger rows snapshot the policy used; current settings
+never recalculate historical points.
+
+Receipt and native sale detail show Member and ledger-backed points earned,
+redeemed, and discount. IPOS_IMPORT remains unassigned and receives no loyalty
+events. Completed-sale reversal/refund is not implemented; future reversals
+must append offset events rather than edit the ledger. See `docs/LOYALTY.md`.

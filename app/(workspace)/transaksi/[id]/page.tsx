@@ -27,6 +27,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
         <div className={styles.meta}><span>Kasir</span><strong>{receipt.cashier_label}</strong></div>
         <div className={styles.meta}><span>No. Transaksi</span><strong>{receipt.sale_number}</strong></div>
         <div className={styles.meta}><span>Status</span><strong>Selesai</strong></div>
+        {receipt.member && <div className={styles.meta}><span>Member</span><strong>{String(receipt.member.full_name ?? "Member")} · {String(receipt.member.member_number ?? "")}</strong></div>}
       </div>
       <div>
         <div className="eyebrow">BARANG</div>
@@ -39,6 +40,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
         </tbody></table>
       </div>
       <div className={styles.meta}><span>PEMBAYARAN</span><div className={styles.paymentList}>
+        {receipt.payments.length === 0 && <div className={styles.payment}><span>Lunas dengan poin</span><strong>{salesMoney(receipt.grand_total)}</strong></div>}
         {receipt.payments.map((payment, index) => <div key={`${String(payment.method)}-${index}`}>
           <div className={styles.payment}><span>{salesPaymentLabel(payment.method)}</span><strong>{salesMoney(payment.applied_amount)}</strong></div>
           {payment.method === "CASH" && <>
@@ -50,8 +52,10 @@ export default async function TransactionDetailPage({ params }: { params: Promis
       </div></div>
       <div className={styles.totals}>
         <div className={styles.totalRow}><span>Subtotal</span><strong>{salesMoney(receipt.subtotal)}</strong></div>
-        {Number(receipt.discount_total) > 0 && <div className={styles.totalRow}><span>Diskon</span><strong>{salesMoney(receipt.discount_total)}</strong></div>}
+        {Number(receipt.discount_total) > 0 && <div className={styles.totalRow}><span>{receipt.loyalty && Number(receipt.loyalty.points_redeemed) > 0 ? "Potongan poin" : "Diskon"}</span><strong>{salesMoney(receipt.discount_total)}</strong></div>}
+        {receipt.loyalty && Number(receipt.loyalty.points_redeemed) > 0 && <div className={styles.totalRow}><span>Poin digunakan</span><strong>{Number(receipt.loyalty.points_redeemed).toLocaleString("id-ID")}</strong></div>}
         <div className={`${styles.totalRow} ${styles.grandTotal}`}><span>Total</span><strong>{salesMoney(receipt.grand_total)}</strong></div>
+        {receipt.loyalty && Number(receipt.loyalty.points_earned) > 0 && <div className={styles.totalRow}><span>Poin diperoleh</span><strong>+{Number(receipt.loyalty.points_earned).toLocaleString("id-ID")}</strong></div>}
       </div>
     </section>
     <ReceiptReprint receipt={receipt} />

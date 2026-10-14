@@ -51,6 +51,13 @@ function messageFor(code: string): string {
     POS_CHECKOUT_CONFLICT: "Permintaan pembayaran berbeda dari transaksi sebelumnya. Muat ulang data.",
     POS_UNAUTHORIZED: "Transaksi tidak dapat diakses oleh akun ini.",
     POS_MEMBER_INACTIVE_OR_NOT_FOUND: "Member sudah tidak aktif atau tidak ditemukan. Hapus pilihan member sebelum membayar.",
+    POS_LOYALTY_MEMBER_REQUIRED: "Pilih member sebelum menukar poin.",
+    POS_LOYALTY_REDEEM_DISABLED: "Penukaran poin sedang tidak tersedia. Muat ulang kasir.",
+    POS_LOYALTY_POLICY_CHANGED: "Aturan penukaran berubah. Periksa jumlah poin dan terapkan kembali sebelum membayar.",
+    POS_LOYALTY_BELOW_MINIMUM: "Jumlah penukaran belum mencapai minimum.",
+    POS_LOYALTY_INSUFFICIENT_POINTS: "Saldo poin berubah atau tidak mencukupi. Muat ulang kasir.",
+    POS_LOYALTY_EXCEEDS_PAYABLE: "Nilai poin melebihi total belanja.",
+    POS_LOYALTY_REDEEM_INVALID: "Jumlah penukaran poin tidak valid.",
     MEMBER_POS_REQUEST_REUSED: "Permintaan perubahan member dipakai untuk data yang berbeda. Muat ulang transaksi.",
     BARCODE_NOT_FOUND: "Barcode belum terdaftar.",
     BARCODE_AMBIGUOUS: "Barcode cocok dengan beberapa barang. Cari barang secara manual.",
@@ -129,6 +136,14 @@ export async function setPosCartMember(cartId: string, memberId: string | null, 
   if (!validUuid(cartId) || (memberId !== null && !validUuid(memberId)) || !validUuid(requestId)
       || !Number.isSafeInteger(revision) || revision < 1) return { ok: false, code: "INVALID_INPUT", message: "Data member atau transaksi tidak valid." };
   return invoke("pos_cart_member_set", { p_cart: cartId, p_member: memberId, p_expected_revision: revision, p_request: requestId });
+}
+
+export async function setPosCartRedeemPoints(cartId: string, points: number, revision: number, requestId: string): Promise<PosResult> {
+  if (!validUuid(cartId) || !validUuid(requestId) || !Number.isSafeInteger(points) || points < 0 || points > 1_000_000_000
+      || !Number.isSafeInteger(revision) || revision < 1) {
+    return { ok: false, code: "POS_LOYALTY_REDEEM_INVALID", message: messageFor("POS_LOYALTY_REDEEM_INVALID") };
+  }
+  return invoke("pos_cart_redeem_points_set", { p_cart: cartId, p_points: points, p_expected_revision: revision, p_request: requestId });
 }
 
 export async function resolvePosBarcode(barcode: string): Promise<PosResult> {

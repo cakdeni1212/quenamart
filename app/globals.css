@@ -324,3 +324,15 @@
   .nav-sublist{margin-left:13px}
   .nav-subitem{min-height:38px;padding-left:14px;font-size:11px}
 }
+
+.pos-loyalty-redeem{display:grid;gap:7px;margin-top:10px;border:1px solid #e7ebe4;border-radius:9px;background:#fbfcfa;padding:11px;color:#40513f}
+.pos-loyalty-redeem>strong{font-size:11px;font-weight:650}
+.pos-loyalty-redeem>small{color:#879184;font-size:9px;line-height:1.5}
+.pos-loyalty-redeem>div{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pos-loyalty-redeem input{width:min(160px,55%);min-height:36px;border:1px solid #dfe5dc;border-radius:7px;padding:7px 9px;font:inherit;font-size:11px}
+.pos-loyalty-redeem>div span{color:#5c6e57;font-size:10px;font-weight:600}
+.pos-loyalty-redeem button{min-height:34px;border:0;border-radius:7px;background:#31583b;padding:7px 11px;color:white;font:inherit;font-size:10px;font-weight:650;cursor:pointer}
+.pos-loyalty-redeem button:disabled{opacity:.55;cursor:not-allowed}
+.pos-loyalty-discount{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;color:#61745c;font-size:10px}
+.pos-loyalty-discount strong{margin-left:auto;color:#456341}
+.pos-payment-total small{display:block;margin-top:4px;color:#879184;font-size:9px}

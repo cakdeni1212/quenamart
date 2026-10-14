@@ -4,7 +4,6 @@ import { requireProfile } from "@/lib/auth/session";
 import styles from "@/components/settings/settings.module.css";
 
 const futureSections = [
-  ["Member & Poin", "Aturan loyalty dan reward."],
   ["Keuangan", "Pengaturan operasional keuangan."],
   ["Sistem", "Informasi aplikasi dan konfigurasi sistem."],
 ] as const;
@@ -24,6 +23,10 @@ export default async function SettingsPage() {
       </Link>
       <Link className={styles.directoryRow} href="/pengaturan/kasir-penjualan">
         <span className={styles.directoryCopy}><strong>Kasir &amp; Penjualan</strong><span>Atur perilaku kasir dan tampilan struk.</span></span>
+        <span className={styles.directoryAction}><span>Aktif</span><span aria-hidden="true">›</span></span>
+      </Link>
+      <Link className={styles.directoryRow} href="/pengaturan/member-poin">
+        <span className={styles.directoryCopy}><strong>Member &amp; Poin</strong><span>Atur cara pelanggan mendapatkan dan menggunakan poin.</span></span>
         <span className={styles.directoryAction}><span>Aktif</span><span aria-hidden="true">›</span></span>
       </Link>
       {profile.role === "OWNER" ? <Link className={styles.directoryRow} href="/pengaturan/akun">

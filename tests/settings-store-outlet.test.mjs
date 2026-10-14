@@ -18,13 +18,15 @@ const [home, detail, form, action, migration, receipt, architecture, styles, but
 test("Settings directory links implemented sections and leaves future sections non-navigable", () => {
   assert.match(home, /href="\/pengaturan\/toko-outlet"/);
   assert.match(home, /href="\/pengaturan\/kasir-penjualan"/);
+  assert.match(home, /href="\/pengaturan\/member-poin"/);
   assert.match(home, /href="\/pengaturan\/akun"/);
   assert.match(home, /Kasir &amp; Penjualan/);
-  assert.match(home, /Member & Poin/);
+  assert.match(home, /Member &amp; Poin/);
+  assert.doesNotMatch(home, /\["Member & Poin"/);
   assert.match(home, /Segera/);
   assert.match(home, /profile\.role !== "OWNER" && profile\.role !== "ADMIN"/);
   assert.match(home, /aria-disabled="true"/);
-  assert.doesNotMatch(home, /href=.*(?:Member|Keuangan|Sistem)/);
+  assert.doesNotMatch(home, /href=.*(?:Keuangan|Sistem)/);
 });
 
 test("outlet route gives OWNER edit controls and ADMIN read-only access", () => {

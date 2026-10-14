@@ -68,6 +68,8 @@ fi
 echo "Two-session activation race: exactly one WAC_ACTIVE transition persisted."
 
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-go-live-pos-e2e.sql"
+"${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-member-points-checkout.sql"
+QUENA_GO_LIVE_STAGING_USER="$staging_user" bash "$repo_root/tests/staging/run-member-points-concurrency.sh"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-operational-expenses-post-wac.sql"
 "${psql_cmd[@]}" -f "$repo_root/tests/staging/runtime-owner-reports.sql"
 echo "GO-LIVE COSTING CONTROLS POSTGRESQL 15 STAGING PASS"

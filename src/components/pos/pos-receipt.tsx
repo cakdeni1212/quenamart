@@ -18,6 +18,8 @@ type ReceiptPayment = {
   reference_text?: unknown;
 };
 
+type ReceiptLoyalty = { points_earned?: unknown; points_redeemed?: unknown; points_discount?: unknown };
+
 export type PosReceiptData = {
   sale_id: string;
   sale_number: string;
@@ -28,6 +30,8 @@ export type PosReceiptData = {
   outlet_phone?: string | null;
   outlet_whatsapp?: string | null;
   receipt_footer_note?: string | null;
+  member?: { member_number?: unknown; full_name?: unknown } | null;
+  loyalty?: ReceiptLoyalty | null;
   items: ReceiptItem[];
   subtotal: number | string;
   discount_total: number | string;
@@ -45,6 +49,7 @@ export function PosReceipt({ receipt, size }: { receipt: PosReceiptData; size: "
       <div><dt>No</dt><dd>{receipt.sale_number}</dd></div>
       <div><dt>Tanggal</dt><dd>{salesDateTime(receipt.completed_at)}</dd></div>
       <div><dt>Kasir</dt><dd>{receipt.cashier_label}</dd></div>
+      {receipt.member && <div><dt>Member</dt><dd>{String(receipt.member.full_name ?? "Member")} · {String(receipt.member.member_number ?? "")}</dd></div>}
     </dl>
     <div className="pos-receipt-rule" />
     <div className="pos-receipt-items">{receipt.items.map((item, index) => <section className="pos-receipt-item" key={`${String(item.sku ?? "item")}-${index}`}>
@@ -53,6 +58,10 @@ export function PosReceipt({ receipt, size }: { receipt: PosReceiptData; size: "
     </section>)}</div>
     <div className="pos-receipt-rule" />
     <div className="pos-receipt-total"><span>TOTAL</span><strong>{salesMoney(receipt.grand_total)}</strong></div>
+    {receipt.loyalty && <div className="pos-receipt-payment">
+      {Number(receipt.loyalty.points_redeemed) > 0 && <div><span>Poin digunakan · potongan</span><b>{String(receipt.loyalty.points_redeemed)} · {salesMoney(receipt.loyalty.points_discount)}</b></div>}
+      {Number(receipt.loyalty.points_earned) > 0 && <div><span>Poin diperoleh</span><b>+{String(receipt.loyalty.points_earned)}</b></div>}
+    </div>}
     {receipt.payments.length > 0 && <div className="pos-receipt-payment">
       {receipt.payments.map((payment, index) => <div key={`${String(payment.method)}-${index}`}>
         <span>{salesPaymentLabel(payment.method)}</span><b>{salesMoney(payment.applied_amount)}</b>

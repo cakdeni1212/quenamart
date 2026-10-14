@@ -7,7 +7,8 @@
 - Server-verified active profile loading and role-aware landing.
 - Protected workspace layout and server section checks.
 - Responsive Quena Mart shell, sidebar, empty-state dashboard, and future metric/chart placeholders.
-- `/pengaturan` provides a concise Settings directory. `/pengaturan/toko-outlet` edits the existing outlet identity; `/pengaturan/kasir-penjualan` manages outlet-scoped receipt presentation, checkout payment availability, hold behavior, and cart-cancellation confirmation. OWNER updates; OWNER/ADMIN read management settings; POS consumes a separate bounded effective-settings contract for KASIR. Future configuration sections remain unavailable and do not link to placeholders.
+- `/pengaturan` provides a concise Settings directory. `/pengaturan/toko-outlet` edits the existing outlet identity; `/pengaturan/kasir-penjualan` manages outlet-scoped receipt presentation, checkout payment availability, hold behavior, and cart-cancellation confirmation; `/pengaturan/member-poin` configures safe-OFF loyalty earning/redemption policy. OWNER updates; OWNER/ADMIN read management settings; POS consumes separate bounded effective-settings contracts. Finance and System remain unavailable and do not link to placeholders.
+- Member loyalty uses atomic native checkout evidence: point redemption reduces payable before point earning is calculated; immutable policy snapshots preserve historical meaning. iPos-imported sales remain unassigned and receive no points.
 - Protected `/hpp-awal` Persiapan HPP Awal workspace for OWNER/ADMIN, using Checkpoint A bounded preview, explicit preparation, reasoned exception resolution, and OWNER-only approval. Warnings remain informational; approval does not bootstrap or change stock.
 
 ## Phase 3C.1B Stock workspace

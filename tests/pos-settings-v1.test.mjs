@@ -11,7 +11,8 @@ test("Kasir & Penjualan is active from Settings and uses the canonical POS setti
     read("src/components/settings/pos-settings-form.tsx"),
   ]);
   assert.match(home, /href="\/pengaturan\/kasir-penjualan"/);
-  assert.match(home, /Member & Poin/);
+  assert.match(home, /href="\/pengaturan\/member-poin"/);
+  assert.match(home, /Member &amp; Poin/);
   assert.match(home, /Keuangan/);
   assert.match(home, /Sistem/);
   assert.match(page, /profile\.role !== "OWNER" && profile\.role !== "ADMIN"/);

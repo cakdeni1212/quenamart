@@ -32,3 +32,19 @@ export async function readPosCartMember(cartId: string) {
   if (error || !record(data) || !record(data.member)) return null;
   return data.member;
 }
+
+export async function readPosCartLoyalty(cartId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("pos_member_loyalty_read", { p_cart: cartId });
+  if (error || !record(data)) return null;
+  const policy = record(data.policy) ? data.policy : null;
+  const member = record(data.member) ? data.member : null;
+  if (!policy) return null;
+  return {
+    member,
+    policy,
+    redeem_points_requested: typeof data.redeem_points_requested === "number" ? data.redeem_points_requested : Number(data.redeem_points_requested ?? 0),
+    redeem_policy_updated_at: typeof data.redeem_policy_updated_at === "string" ? data.redeem_policy_updated_at : null,
+    redeem_policy_revision: Number(data.redeem_policy_revision ?? 0),
+  };
+}

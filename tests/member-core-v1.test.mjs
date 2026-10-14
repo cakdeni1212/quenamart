@@ -72,7 +72,8 @@ test("Member transaction and point reads do not fabricate iPos attribution or ea
   assert.match(sql, /NEW\.member_id:=NULL/);
   assert.match(sql, /sum\(l\.points_delta\)/);
   assert.doesNotMatch(sql, /INSERT INTO public\.member_point_ledger[\s\S]{0,200}SALE_EARN/);
-  assert.match(docs, /No earning events are generated yet/);
-  assert.match(docs, /Not implemented yet/);
-  assert.match(docs, /iPos member attribution/);
+  assert.match(docs, /New members start at\n  zero; creating a member does not award points/);
+  assert.match(docs, /IPOS_IMPORT` does not earn or redeem/);
+  assert.match(docs, /## Deferred/);
+  assert.match(docs, /iPos Member attribution/);
 });

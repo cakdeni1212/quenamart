@@ -295,11 +295,23 @@ Migration `20260929476000_member_core_v1.sql` adds an outlet-scoped customer
 identity, generated immutable `QMEM-########` number, opaque lookup token,
 normalized-phone uniqueness for active members, append-only member audit and
 point-ledger evidence, and a nullable canonical Member reference on POS carts
-and sales. It does not add earning or redemption rules. Member list/detail
+and sales. Member list/detail
 metrics derive from completed native Quena sales; IPOS_IMPORT remains
 unassigned. OWNER/ADMIN use the bounded management reads and mutations. KASIR
 can use only the limited active-member POS lookup/association contract;
 GUDANG has no access. Checkout locks and revalidates the selected Member before
 sale evidence is written, so deactivation cannot create a partial sale. Direct
-table DML is revoked. See `docs/LOYALTY.md` for implemented and deferred policy
-scope.
+table DML is revoked.
+
+### Member & Poin policy V1
+
+Migration `20260929477000_member_loyalty_policy_v1.sql` adds outlet-scoped
+policy settings with safe OFF defaults and OWNER audit evidence. The POS reads
+only a bounded effective-policy/member contract; direct settings and point
+ledger DML remain revoked. The atomic checkout writer validates member status,
+current policy revision, balance, minimum redemption, and payable amount while
+holding the member lock. It appends sale-linked earn/redeem ledger rows with
+policy snapshots in the same transaction as sale, tender, stock, and costing
+evidence. The unique sale/event index plus checkout request identity prevent
+replays from changing points twice. See `docs/LOYALTY.md` for formula and
+deferred policy scope.
