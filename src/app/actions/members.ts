@@ -45,7 +45,14 @@ export async function searchMembers(search: string, page = 1): Promise<Result> {
   if (!profile || !["OWNER", "ADMIN"].includes(profile.role)) return { ok: false, code: "FORBIDDEN", message: message.MEMBER_WRITE_DENIED };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("member_workspace_read", { p_search: search.slice(0, 80), p_page: page, p_page_size: 20 });
-  if (error) return { ok: false, code: "MEMBER_READ_FAILED", message: "Data member belum dapat dimuat." };
+  if (error) {
+    console.error("[member_workspace_read] Supabase RPC failed", { code: error.code, message: error.message });
+    return { ok: false, code: "MEMBER_READ_FAILED", message: "Data member belum dapat dimuat." };
+  }
+  if (!data || typeof data !== "object" || !Array.isArray((data as Record<string, unknown>).rows)) {
+    console.error("[member_workspace_read] Invalid response contract", { responseType: Array.isArray(data) ? "array" : typeof data });
+    return { ok: false, code: "MEMBER_READ_CONTRACT_INVALID", message: "Data member belum dapat dimuat." };
+  }
   return { ok: true, value: data && typeof data === "object" ? data as Record<string, unknown> : {} };
 }
 

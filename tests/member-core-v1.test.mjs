@@ -39,6 +39,9 @@ test("Member workspace is bounded and role limited; POS lookup exposes only acti
   assert.match(workspace, /Cari nama, nomor HP, ID Member, atau kode member/);
   assert.match(workspace, /setTimeout\(async \(\) =>/);
   assert.match(workspace, /Simpan Member/);
+  assert.match(workspace, /loadError \? null : rows\.length \?/);
+  assert.match(reader, /Supabase RPC failed.*error\.code.*error\.message/s);
+  assert.match(reader, /Invalid response contract/);
 });
 
 test("POS stores canonical active member and checkout rejects stale inactive member atomically", async () => {
