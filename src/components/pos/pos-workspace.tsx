@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, checkoutPos, createPosCart, ensureActivePosCart, parkPosCart, readPosSaleReceipt, resolvePosBarcode, resumePosCart, searchPosMembers, searchPosProducts, setPosCartItemQuantity, setPosCartMember, setPosCartRedeemPoints } from "@/app/actions/pos-cart";
+import { acknowledgePosCartPrice, addPosCartItem, cancelPosCart, checkoutPos, createPosCart, ensureActivePosCart, parkPosCart, readPosSaleReceipt, registerPosMember, resolvePosBarcode, resumePosCart, searchPosMembers, searchPosProducts, setPosCartItemQuantity, setPosCartMember, setPosCartRedeemPoints } from "@/app/actions/pos-cart";
 import { PosReceipt, type PosReceiptData } from "@/components/pos/pos-receipt";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { ceilRupiah, compareRupiah, formatRupiah, subtractRupiah } from "@/lib/money";
@@ -29,6 +29,7 @@ export function PosWorkspace({ initialCarts, initialError, settings, initialLoya
   const [results, setResults] = useState<Row[]>([]);
   const [memberQuery, setMemberQuery] = useState("");
   const [memberResults, setMemberResults] = useState<Row[]>([]);
+  const [memberCreateOpen, setMemberCreateOpen] = useState(false);
   const loyalty = initialLoyalty;
   const selectedMember = initialLoyalty?.member ?? null;
   const [redeemDraft, setRedeemDraft] = useState("");
@@ -98,6 +99,38 @@ export function PosWorkspace({ initialCarts, initialError, settings, initialLoya
     const result = await setPosCartMember(cart.id, candidate ? String(candidate.id) : null, cart.revision, uuid());
     if (!result.ok) { setBusy(false); setNotice(result.message); reload(); return; }
     setRedeemDraft(""); setMemberQuery(""); setMemberResults([]); setNotice(""); setBusy(false); reload();
+    if (candidate) window.setTimeout(() => input.current?.focus(), 80);
+  };
+
+  const lookupExactMember = async () => {
+    const search = memberQuery.trim();
+    if (!cart || busy || search.length < 2) return;
+    memberSearchSequence.current += 1;
+    setBusy(true); setNotice("");
+    const found = await searchPosMembers(search);
+    if (!found.ok) { setBusy(false); setNotice(found.message); return; }
+    const rows = Array.isArray(found.value.rows) ? found.value.rows.filter((row): row is Row => typeof row === "object" && row !== null) : [];
+    const exact = rows.find((row) => row.exact_match === true);
+    if (!exact) { setBusy(false); setMemberResults(rows); setNotice("Member belum ditemukan. Periksa nomor, ID, atau kode kartu."); return; }
+    const attached = await setPosCartMember(cart.id, String(exact.id), cart.revision, uuid());
+    setBusy(false);
+    if (!attached.ok) { setNotice(attached.message); reload(); return; }
+    setRedeemDraft(""); setMemberQuery(""); setMemberResults([]); setNotice(""); reload();
+    window.setTimeout(() => input.current?.focus(), 80);
+  };
+
+  const createAndAttachMember = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!cart || busy) return;
+    const form = new FormData(event.currentTarget);
+    setBusy(true); setNotice("");
+    const result = await registerPosMember({ cartId: cart.id, expectedRevision: cart.revision,
+      name: String(form.get("name") ?? ""), phone: String(form.get("phone") ?? ""), email: String(form.get("email") ?? ""),
+      serviceConsent: form.get("serviceConsent") === "on", promotionalConsent: form.get("promotionalConsent") === "on" });
+    setBusy(false);
+    if (!result.ok) { setNotice(result.message); return; }
+    setMemberCreateOpen(false); setMemberQuery(""); setMemberResults([]); setNotice("Member berhasil dibuat dan dipilih.");
+    reload(); window.setTimeout(() => input.current?.focus(), 80);
   };
 
   const applyRedeem = async () => {
@@ -230,14 +263,15 @@ export function PosWorkspace({ initialCarts, initialError, settings, initialLoya
     <section className="pos-entry surface-card" aria-label="Cari dan masukkan produk">
       <div className={memberStyles.panel}>
         <label htmlFor="pos-member-query">Member (opsional)</label>
-        {selectedMember ? <div className={memberStyles.selected}><span><strong>{text(selectedMember.full_name)}</strong><small>{text(selectedMember.member_number)} · Poin {Number(loyalty?.member?.point_balance ?? selectedMember.point_balance ?? 0).toLocaleString("id-ID")}</small></span><button type="button" disabled={busy || !cart} onClick={() => void chooseMember(null)}>Hapus</button></div> : <input id="pos-member-query" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="Cari nomor HP, ID Member, atau scan kode" autoComplete="off" disabled={!cart || busy} />}
+        {selectedMember ? <div className={memberStyles.selected}><span><strong>{text(selectedMember.full_name)}</strong><small>{text(selectedMember.member_number)} · {text(selectedMember.phone_masked)} · Saldo Poin: {Number(loyalty?.member?.point_balance ?? selectedMember.point_balance ?? 0).toLocaleString("id-ID")}</small></span><button type="button" disabled={busy || !cart} onClick={() => void chooseMember(null)}>Hapus</button></div> : <><input id="pos-member-query" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void lookupExactMember(); } }} placeholder="Cari nama, nomor WA, ID Member, atau scan kartu" autoComplete="off" disabled={!cart || busy} /><button type="button" className={memberStyles.register} disabled={!cart || busy} onClick={() => setMemberCreateOpen(true)}>+ Daftar Member</button></>}
         {selectedMember && loyalty?.policy.program_enabled === true && loyalty.policy.redeem_enabled === true && <div className="pos-loyalty-redeem">
           <strong>Tukar Poin</strong><small>Saldo {Number(loyalty.member?.point_balance ?? selectedMember.point_balance ?? 0).toLocaleString("id-ID")} poin · minimum {Number(loyalty.policy.minimum_redeem_points).toLocaleString("id-ID")} poin · 1 poin = {rupiah(loyalty.policy.rupiah_per_redeem_point)}</small>
           {redemptionPolicyStale && <small role="alert">Aturan penukaran berubah. Periksa jumlah poin lalu terapkan kembali.</small>}
           <div><input aria-label="Jumlah poin yang digunakan" inputMode="numeric" value={redeemDraft || (redemptionPolicyStale ? String(pointsRequested) : "")} onChange={(event) => setRedeemDraft(event.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="Jumlah poin" disabled={!cart || busy} /><span>{(redeemDraft || (redemptionPolicyStale ? String(pointsRequested) : "")) && redeemRate ? rupiah((BigInt(redeemDraft || String(pointsRequested)) * BigInt(redeemRate)).toString()) : "Potongan"}</span></div>
           <button type="button" disabled={!cart || busy || !/^\d{1,9}$/.test(redeemDraft || (redemptionPolicyStale ? String(pointsRequested) : ""))} onClick={() => void applyRedeem()}>{redemptionPolicyStale ? "Terapkan Ulang" : pointsRequested > 0 ? "Perbarui Penukaran" : "Terapkan"}</button>
         </div>}
-        {memberQuery.trim().length >= 2 && memberResults.length > 0 && <div className={memberStyles.results} role="group" aria-label="Hasil pencarian member">{memberResults.map((candidate) => <button type="button" key={String(candidate.id)} disabled={busy} onClick={() => void chooseMember(candidate)}><strong>{text(candidate.full_name)}</strong><small>{text(candidate.member_number)} · {text(candidate.phone)}</small></button>)}</div>}
+        {memberQuery.trim().length >= 2 && memberResults.length > 0 && <div className={memberStyles.results} role="group" aria-label="Hasil pencarian member">{memberResults.map((candidate) => <button type="button" key={String(candidate.id)} disabled={busy} onClick={() => void chooseMember(candidate)}><strong>{text(candidate.full_name)}</strong><small>{text(candidate.member_number)} · {text(candidate.phone_masked)}</small></button>)}</div>}
+        {memberCreateOpen && <div className={memberStyles.backdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setMemberCreateOpen(false); }}><form className={memberStyles.dialog} onSubmit={(event) => void createAndAttachMember(event)}><header><div><span className="eyebrow">MEMBER BARU</span><h2>Daftar Member</h2></div><button type="button" aria-label="Tutup" disabled={busy} onClick={() => setMemberCreateOpen(false)}>×</button></header><label>Nama *<input name="name" required maxLength={160} autoFocus /></label><label>Nomor WhatsApp *<input name="phone" type="tel" inputMode="tel" autoComplete="tel" required maxLength={40} /></label><label>Email (opsional)<input name="email" type="email" maxLength={254} /></label><label className={memberStyles.consent}><input name="serviceConsent" type="checkbox" required /><span>Saya menyetujui data digunakan untuk layanan membership dan komunikasi transaksi.</span></label><label className={memberStyles.consent}><input name="promotionalConsent" type="checkbox" /><span>Saya bersedia menerima informasi promo melalui WhatsApp (opsional).</span></label>{notice && <p role="alert">{notice}</p>}<footer><button type="button" disabled={busy} onClick={() => setMemberCreateOpen(false)}>Batal</button><button type="submit" disabled={busy}>{busy ? "Menyimpan…" : "Daftar & Pilih"}</button></footer></form></div>}
       </div>
       <div className="pos-section-head"><div><span className="eyebrow">INPUT BARANG</span><h2>Scan atau cari produk</h2></div><span className="pos-live-dot">Siap scan</span></div>
       <label className="pos-search-label" htmlFor="pos-product-query">Barcode, nama produk, atau SKU</label>

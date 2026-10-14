@@ -315,3 +315,22 @@ policy snapshots in the same transaction as sale, tender, stock, and costing
 evidence. The unique sale/event index plus checkout request identity prevent
 replays from changing points twice. See `docs/LOYALTY.md` for formula and
 deferred policy scope.
+
+### No-app Member access V1
+
+Migration `20260929478000_member_public_access_foundation_v1.sql` adds
+append-only Member consent evidence and service-only public registration.
+Public registration can create identity only through the server action's
+service-role client; no anon/authenticated role can execute the RPC or read
+Member/consent/ledger tables. The action HMACs network and normalized-phone
+identifiers using the server service credential before sending only digests to
+the rate-limit table. Registration requires service consent and separately
+records optional promotional consent. Public duplicate results contain no
+Member identity or point data. POS registration is a separate authenticated
+OWNER/ADMIN/KASIR RPC that creates the Member, consent evidence, and cart
+association atomically. POS lookup output is bounded and masks phone; exact
+opaque-token matches remain identifier-only and do not authorize public reads.
+
+No OTP, customer portal session, public point-history RPC, receipt token, or
+WhatsApp notification queue exists yet. `/member-quena/cek` fails closed until
+a verified customer access mechanism is implemented. See `docs/LOYALTY.md`.

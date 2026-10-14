@@ -24,6 +24,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE SCHEMA auth;
 CREATE TABLE auth.users(id uuid PRIMARY KEY);
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('quena.test.actor',true),'')::uuid $$;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.role',true),'') $$;
 CREATE TYPE public.user_role AS ENUM('OWNER','ADMIN','KASIR','GUDANG');
 CREATE TYPE public.pos_sale_source AS ENUM('QUENA_POS','IPOS_IMPORT');
 CREATE TYPE public.pos_sale_status AS ENUM('COMPLETED');
@@ -38,6 +39,8 @@ SQL
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929476000_member_core_v1.sql" >/dev/null
 "${PSQL[@]}" -f "$ROOT/tests/staging/member-points-runtime-prerequisites.sql" >/dev/null
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929477000_member_loyalty_policy_v1.sql" >"$TMP/migration.log"
+"${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929478000_member_public_access_foundation_v1.sql" >"$TMP/access-migration.log"
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-member-points-policy.sql" >"$TMP/runtime.log"
-cat "$TMP/migration.log" "$TMP/runtime.log"
-echo 'PASS: 476000 + 477000 apply and policy/RLS/audit matrix ran on disposable PostgreSQL 15; cluster removed on exit'
+"${PSQL[@]}" -f "$ROOT/tests/staging/runtime-member-public-access.sql" >"$TMP/access-runtime.log"
+cat "$TMP/migration.log" "$TMP/access-migration.log" "$TMP/runtime.log" "$TMP/access-runtime.log"
+echo 'PASS: 476000 + 477000 + 478000 apply and loyalty/public-access matrices ran on disposable PostgreSQL 15; cluster removed on exit'

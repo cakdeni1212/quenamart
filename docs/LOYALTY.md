@@ -59,13 +59,48 @@ mutate stock, WAC, or existing Member history.
 
 ## Deferred
 
-- Tiers, birthday/signup bonuses, campaigns, multipliers, reward catalog,
-  expiration, and member-facing PWA/card.
+- Tiers, birthday/signup bonuses, campaigns, multipliers, reward catalog, and
+  expiration.
 - Manual point adjustment and opening-balance import UI.
 - Completed-sale refund/reversal workflow. The ledger supports future
   offsetting reversal event types, but the application has no authoritative
   completed-sale reversal operation yet.
 - iPos Member attribution.
+
+## No-app Member access V1
+
+Migration `20260929478000_member_public_access_foundation_v1.sql` adds public
+web registration, append-only consent evidence, hashed attempt windows, and a
+server-only service-role registration RPC. Membership service consent is
+required; WhatsApp promotional consent is recorded separately and defaults
+false. Public registration returns only the generated Member number. The
+server derives keyed IP/normalized-phone digests and the database limits a
+network digest to 10 registrations/hour and a phone digest to 3/hour. Public
+roles receive no Member, consent, ledger, or registration-table grants.
+
+`/member-quena` is the no-app landing page and `/member-quena/daftar` creates a
+Member without staff login. `/member-quena/cek` is a fail-closed verification
+placeholder: phone-only point lookup is not available until a verified
+WhatsApp/OTP channel is configured. Signup does not create a portal session or
+expose points/history. No WhatsApp provider or customer app is integrated.
+
+POS lookup continues to use the canonical Member ID, normalized phone/name,
+and exact opaque Member token. Enter on the Member field performs exact lookup;
+cashier results expose a masked phone and no opaque token. Cashier enrollment
+requires service consent, keeps promotional consent independent, and atomically
+attaches the new Member to the active cart. Registration itself awards no
+points. The personal QR on staff-only Member detail encodes only the existing
+POS lookup token; it is not a portal credential. `/pengaturan/member-poin`
+shows the generic registration QR only to OWNER and only when
+`NEXT_PUBLIC_APP_URL` is configured to HTTPS (or local development); that QR
+opens the generic landing page and does not identify a Member.
+
+Customer point portal sessions, external WhatsApp OTP/receipts, customer-facing
+personal card access, digital receipt links, and asynchronous notification
+delivery remain deferred until a verified customer access channel and receipt
+token contract are implemented. The customer roadmap is mobile web plus
+WhatsApp, not an installable customer app. See `docs/POS.md` and
+`docs/DATABASE.md` for lookup and grant boundaries.
 
 No earn or redemption rate is seeded as business truth. Member identity and
 history remain usable while the program is OFF; disabling it preserves every

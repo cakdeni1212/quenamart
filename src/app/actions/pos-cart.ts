@@ -51,6 +51,9 @@ function messageFor(code: string): string {
     POS_CHECKOUT_CONFLICT: "Permintaan pembayaran berbeda dari transaksi sebelumnya. Muat ulang data.",
     POS_UNAUTHORIZED: "Transaksi tidak dapat diakses oleh akun ini.",
     POS_MEMBER_INACTIVE_OR_NOT_FOUND: "Member sudah tidak aktif atau tidak ditemukan. Hapus pilihan member sebelum membayar.",
+    MEMBER_FIELDS_INVALID: "Periksa nama, nomor WhatsApp, dan persetujuan layanan.",
+    MEMBER_PHONE_DUPLICATE: "Nomor WhatsApp ini sudah terdaftar. Cari dan pilih Member tersebut.",
+    MEMBER_CONSENT_REQUIRED: "Persetujuan layanan membership diperlukan.",
     POS_LOYALTY_MEMBER_REQUIRED: "Pilih member sebelum menukar poin.",
     POS_LOYALTY_REDEEM_DISABLED: "Penukaran poin sedang tidak tersedia. Muat ulang kasir.",
     POS_LOYALTY_POLICY_CHANGED: "Aturan penukaran berubah. Periksa jumlah poin dan terapkan kembali sebelum membayar.",
@@ -130,6 +133,19 @@ export async function cancelPosCart(cartId: string, expectedRevision: number, re
 export async function searchPosMembers(search: string): Promise<PosResult> {
   if (search.trim().length < 2 || search.length > 80) return { ok: true, value: { rows: [] } };
   return invoke("member_pos_search", { p_search: search.trim(), p_limit: 10 });
+}
+
+export async function registerPosMember(input: { cartId: string; expectedRevision: number; name: string; phone: string; email: string; serviceConsent: boolean; promotionalConsent: boolean }): Promise<PosResult> {
+  if (!validUuid(input.cartId) || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1
+    || input.name.trim().length < 1 || input.name.length > 160 || input.phone.length > 40 || input.email.length > 254 || !input.serviceConsent) {
+    return { ok: false, code: "MEMBER_FIELDS_INVALID", message: "Periksa nama, nomor WhatsApp, dan persetujuan layanan." };
+  }
+  const result = await invoke("pos_member_register", { p_cart: input.cartId, p_expected_revision: input.expectedRevision,
+    p_full_name: input.name, p_phone: input.phone, p_email: input.email.trim() || null,
+    p_request_id: crypto.randomUUID(), p_membership_consent: true,
+    p_promotional_consent: Boolean(input.promotionalConsent) });
+  if (!result.ok) return result;
+  return { ok: true, value: { member_number: result.value.member_number } };
 }
 
 export async function setPosCartMember(cartId: string, memberId: string | null, revision: number, requestId: string): Promise<PosResult> {

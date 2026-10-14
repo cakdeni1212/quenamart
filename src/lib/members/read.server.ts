@@ -16,7 +16,12 @@ export async function readMemberPage(search = "", page = 1) {
     console.error("[member_workspace_read] Invalid response contract", { responseType: Array.isArray(data) ? "array" : typeof data, hasRows: record(data) && Array.isArray(data.rows) });
     return { rows: [], total: 0, page, pageSize: 20, error: "Data member belum dapat dimuat." };
   }
-  return { rows: data.rows.filter(record), total: Number(data.total ?? 0), page: Number(data.page ?? page), pageSize: Number(data.pageSize ?? 20), error: null };
+  const rows = data.rows.filter(record).map((row: Record<string, unknown>) => {
+    const safeRow = { ...row };
+    delete safeRow.member_token;
+    return safeRow;
+  });
+  return { rows, total: Number(data.total ?? 0), page: Number(data.page ?? page), pageSize: Number(data.pageSize ?? 20), error: null };
 }
 
 export async function readMemberDetail(id: string) {

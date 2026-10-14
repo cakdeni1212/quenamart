@@ -80,3 +80,29 @@ Receipt and native sale detail show Member and ledger-backed points earned,
 redeemed, and discount. IPOS_IMPORT remains unassigned and receives no loyalty
 events. Completed-sale reversal/refund is not implemented; future reversals
 must append offset events rather than edit the ledger. See `docs/LOYALTY.md`.
+
+## No-app Member access
+
+KASIR lookup accepts name, normalized WhatsApp/phone, immutable Member ID, and
+an exact opaque POS token submitted with Enter. Search is bounded to 10 rows;
+cashier phone fields are masked and the token is not returned. New cashier
+enrollment requires service-consent acknowledgement, records promotional
+WhatsApp consent separately (false unless explicitly selected), and creates
+and attaches the Member to the active cart in one database transaction. It
+does not award signup points. Existing held-cart Member associations remain
+cart-scoped.
+
+Public pages `/member-quena`, `/member-quena/daftar`, and `/member-quena/cek`
+are outside the staff workspace. Registration uses a narrowly granted
+service-role RPC from a server action; anonymous clients cannot read Member,
+consent, point ledger, or sales data. The RPC stores keyed phone/IP digests for
+bounded registration attempts and returns only a Member number or generic
+duplicate/rate-limit result. Set `NEXT_PUBLIC_APP_URL` to the public HTTPS
+origin to generate the generic registration QR in OWNER Member & Poin
+settings. Member detail displays a staff-only QR containing the POS lookup
+token; it is an identifier, never an authenticated web credential.
+
+The points page deliberately does not accept a phone number or reveal a
+balance: verified WhatsApp/OTP delivery is not configured. Customer portal
+sessions, digital receipt links, and asynchronous WhatsApp receipt delivery
+are deferred; checkout never calls a messaging provider.
