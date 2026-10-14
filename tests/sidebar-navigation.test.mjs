@@ -42,6 +42,12 @@ test("active links and role-scoped child visibility remain tied to existing perm
   assert.match(sidebar, /isTransactionTree = item\.label === "Transaksi" && \(role === "OWNER" \|\| role === "ADMIN"\)/);
 });
 
+test("Pengaturan remains a direct destination without an Akun & Akses sidebar child", () => {
+  assert.match(sidebar, /\{ label: "Pengaturan", href: "\/pengaturan", section: "pengaturan"/);
+  assert.doesNotMatch(sidebar, /Akun &amp; Akses|href="\/pengaturan\/akun"/);
+  assert.doesNotMatch(sidebar, /Menu Pengaturan/);
+});
+
 test("desktop shell and compact viewport keep navigation independently reachable", () => {
   assert.match(css, /\.sidebar\{height:100dvh/);
   assert.match(css, /\.nav-list\{display:flex;flex:1;min-height:0/);
