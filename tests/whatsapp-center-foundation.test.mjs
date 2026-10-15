@@ -68,3 +68,29 @@ test("transaction detail and management pages use role-gated bounded contracts",
   assert.match(summary, /readWhatsAppSummary/);
   assert.match(migration, /destination_masked/);
 });
+
+test("WhatsApp Center uses the existing summary/settings contracts and retains role access", async () => {
+  const summary = await readFile(new URL("../app/(workspace)/whatsapp/page.tsx", import.meta.url), "utf8");
+  const controls = await readFile(new URL("../src/components/notifications/whatsapp-center-controls.tsx", import.meta.url), "utf8");
+  const roles = await readFile(new URL("../src/lib/auth/roles.ts", import.meta.url), "utf8");
+  assert.match(summary, /readWhatsAppSummary\(\)/);
+  assert.match(summary, /readWhatsAppSettings\(\)/);
+  assert.match(summary, /canAccessSection\(profile\.role,\s*"whatsapp"\)/);
+  assert.match(summary, /Riwayat Pengiriman/);
+  assert.match(summary, /Belum ada notifikasi WhatsApp\./);
+  assert.match(roles, /whatsapp: \["OWNER", "ADMIN"\]/);
+  assert.match(summary, /canEdit={profile\.role === "OWNER"}/);
+  assert.match(controls, /disabled={!canEdit \|\| saving/);
+  assert.match(controls, /ADMIN dapat melihat pengaturan/);
+  assert.match(controls, /updateWhatsAppSettings/);
+  assert.match(controls, /<QuenaSwitch/);
+  assert.match(controls, /router\.refresh\(\)/);
+});
+
+test("WhatsApp Center dashboard has responsive two-column and mobile ordering", async () => {
+  const css = await readFile(new URL("../src/components/notifications/whatsapp-center.module.css", import.meta.url), "utf8");
+  assert.match(css, /grid-template-columns:minmax\(0,3fr\) minmax\(300px,1fr\)/);
+  assert.match(css, /grid-template-areas:"status quick" "metrics quick" "history info"/);
+  assert.match(css, /"status" "metrics" "quick" "info" "history"/);
+  assert.match(css, /overflow-x:auto/);
+});
