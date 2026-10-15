@@ -331,11 +331,23 @@ OWNER/ADMIN/KASIR RPC that creates the Member, consent evidence, and cart
 association atomically. POS lookup output is bounded and masks phone; exact
 opaque-token matches remain identifier-only and do not authorize public reads.
 
-No OTP, customer portal session, public point-history RPC, or WhatsApp
-notification queue exists yet. `/member-quena/cek` fails closed until a
+No OTP, customer portal session, or public point-history RPC exists yet.
+`/member-quena/cek` fails closed until a
 verified customer access mechanism is implemented. Digital receipt access is
 implemented separately by migration `20260929479000_digital_receipt_v1.sql`:
 one hash-only token identity per newly completed `QUENA_POS` sale, exact-token
 service-only resolution, and no anonymous table grants. It does not backfill
 historical sales or cover `IPOS_IMPORT`. See `docs/DIGITAL_RECEIPTS.md` and
 `docs/LOYALTY.md`.
+
+Migration `20260929480000_whatsapp_center_foundation_v1.sql` creates an
+outlet-scoped, OFF-by-default provider-neutral WhatsApp configuration and
+notification outbox. It creates no historical jobs, does not change sale,
+stock, WAC, loyalty, or consent evidence, and grants no browser role direct
+outbox table access. Checkout completion may atomically record a job only when
+automation, provider state, HTTPS URL readiness, native sale/member/consent,
+and receipt identity are all valid. The provider state defaults to
+`NOT_CONFIGURED`; HTTPS readiness defaults false. Worker claim/result RPCs are
+service-role-only and use bounded attempts, leases, and `SKIP LOCKED`. The
+receipt bearer URL is not stored in the outbox; only the receipt identity
+reference is snapshotted. No actual provider sender is implemented.

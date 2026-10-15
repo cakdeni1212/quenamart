@@ -21,6 +21,7 @@ const navigation: { label: string; href: string; section: AppSection; icon: stri
   { label: "Member", href: "/member", section: "member", icon: "♧" },
   { label: "Laporan", href: "/laporan", section: "laporan", icon: "▥" },
   { label: "Pengaturan", href: "/pengaturan", section: "pengaturan", icon: "⚙" },
+  { label: "WhatsApp", href: "/whatsapp", section: "whatsapp", icon: "◌" },
   { label: "Import iPos", href: "/import-ipos", section: "import-ipos", icon: "⇧" },
 ];
 

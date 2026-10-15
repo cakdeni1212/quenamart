@@ -7,6 +7,7 @@ import { salesDateTime, salesMoney, salesPaymentLabel, salesQuantity } from "@/l
 import type { PosReceiptData } from "@/components/pos/pos-receipt";
 import { ReceiptReprint } from "@/components/sales/receipt-reprint";
 import { StaffDigitalReceiptLink } from "@/components/receipts/staff-digital-receipt-link";
+import { WhatsAppDeliveryStatus } from "@/components/sales/whatsapp-delivery-status";
 import styles from "@/components/sales/sales-history.module.css";
 
 export default async function TransactionDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,5 +62,6 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     </section>
     <ReceiptReprint receipt={receipt} />
     <StaffDigitalReceiptLink saleId={receipt.sale_id} />
+    <WhatsAppDeliveryStatus saleId={receipt.sale_id} />
   </main>;
 }

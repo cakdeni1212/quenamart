@@ -29,6 +29,10 @@ export default async function SettingsPage() {
         <span className={styles.directoryCopy}><strong>Member &amp; Poin</strong><span>Atur cara pelanggan mendapatkan dan menggunakan poin.</span></span>
         <span className={styles.directoryAction}><span>Aktif</span><span aria-hidden="true">›</span></span>
       </Link>
+      <Link className={styles.directoryRow} href="/pengaturan/whatsapp">
+        <span className={styles.directoryCopy}><strong>WhatsApp</strong><span>Pengaturan pesan transaksi dan struk digital.</span></span>
+        <span className={styles.directoryAction}><span>Aktif</span><span aria-hidden="true">›</span></span>
+      </Link>
       {profile.role === "OWNER" ? <Link className={styles.directoryRow} href="/pengaturan/akun">
         <span className={styles.directoryCopy}><strong>Pengguna &amp; Akses</strong><span>Kelola akun, role, dan status pengguna.</span></span>
         <span className={styles.directoryAction}><span aria-hidden="true">›</span></span>

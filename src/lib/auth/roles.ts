@@ -22,6 +22,7 @@ export type AppSection =
   | "tempo-supplier"
   | "member"
   | "laporan"
+  | "whatsapp"
   | "pengaturan"
   | "akun"
   | "import-ipos";
@@ -39,6 +40,7 @@ const sectionAccess: Record<AppSection, readonly UserRole[]> = {
   "tempo-supplier": ["OWNER", "ADMIN"],
   member: ["OWNER", "ADMIN"],
   laporan: ["OWNER", "ADMIN"],
+  whatsapp: ["OWNER", "ADMIN"],
   pengaturan: ["OWNER", "ADMIN"],
   akun: ["OWNER"],
   "import-ipos": ["OWNER", "ADMIN", "GUDANG"],

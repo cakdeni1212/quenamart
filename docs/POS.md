@@ -104,8 +104,8 @@ token; it is an identifier, never an authenticated web credential.
 
 The points page deliberately does not accept a phone number or reveal a
 balance: verified WhatsApp/OTP delivery is not configured. Customer point
-portal sessions and asynchronous WhatsApp receipt delivery are deferred;
-checkout never calls a messaging provider. Secure digital receipts are
+portal sessions remain deferred; WhatsApp Center has an outbox foundation but
+no provider or external sending. Checkout never calls a messaging provider. Secure digital receipts are
 available separately for completed native sales; see
 [`DIGITAL_RECEIPTS.md`](DIGITAL_RECEIPTS.md).
 
@@ -124,5 +124,12 @@ fields (display name, address, phone, footer) use current receipt settings where
 older sale snapshots do not exist. The public view excludes member contact
 details, internal identifiers, payment references, and all costing/profit
 fields. Staff can open a relative link locally; a shareable absolute HTTPS URL
-requires `NEXT_PUBLIC_APP_URL`. No provider, notification queue, or WhatsApp
-send is implemented.
+requires `NEXT_PUBLIC_APP_URL`. Migration `20260929480000_whatsapp_center_foundation_v1.sql`
+adds an inactive-by-default notification outbox, transactional receipt
+eligibility, OWNER settings, and an operational dashboard. A job is recorded
+only when transaction automation, provider readiness, HTTPS URL readiness,
+active Member, normalized WhatsApp, affirmative latest service consent, and a
+receipt identity all exist. Promotional consent is independent. Checkout never
+calls a provider. V1 has no actual provider, connection workflow, or external
+send; the unconfigured adapter refuses work without retrying. See
+[`WHATSAPP_CENTER.md`](WHATSAPP_CENTER.md).

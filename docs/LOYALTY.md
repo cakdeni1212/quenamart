@@ -96,7 +96,9 @@ shows the generic registration QR only to OWNER and only when
 opens the generic landing page and does not identify a Member.
 
 Customer point portal sessions, external WhatsApp OTP/receipts, customer-facing
-personal card access, and asynchronous notification delivery remain deferred.
+personal card access, and actual notification delivery remain deferred. The
+WhatsApp Center records only eligible transactional receipt intent after a
+provider and public URL are marked ready; it does not send messages.
 Secure digital receipts are implemented for completed native sales; their
 Member and point summary is sourced only from the sale-linked immutable ledger
 snapshots. No current loyalty policy is used to recalculate a receipt. The

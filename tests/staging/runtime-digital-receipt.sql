@@ -166,4 +166,6 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-ROLLBACK;
+\ir runtime-whatsapp-center.sql
+
+COMMIT;

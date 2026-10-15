@@ -218,6 +218,11 @@ export async function readPosSaleReceipt(saleId: string): Promise<PosResult> {
   return result;
 }
 
+export async function readWhatsAppSaleDeliveryStatus(saleId: string): Promise<PosResult> {
+  if (!validUuid(saleId)) return { ok: false, code: "INVALID_REQUEST", message: "Status pesan tidak tersedia." };
+  return invoke("whatsapp_sale_delivery_status", { p_sale_id: saleId });
+}
+
 export type DigitalReceiptLinkResult =
   | { ok: true; path: string; publicUrl: string | null; publicUrlConfigured: boolean }
   | { ok: false; message: string };

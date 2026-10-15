@@ -35,10 +35,13 @@ The server-only `getCustomerReceiptDeliveryPayload` contract is a preparation
 boundary for a future worker. It requires a completed native sale, a normalized
 Member WhatsApp destination, and latest affirmative `MEMBERSHIP_SERVICE`
 consent; promotional consent is separate. It returns a scoped receipt URL and
-safe delivery facts but sends nothing. There is no WhatsApp provider, queue,
-OTP, member point portal session, campaign, or customer app. Any future
-notification worker must remain asynchronous and outside checkout success.
+safe delivery facts but sends nothing. Migration
+`20260929480000_whatsapp_center_foundation_v1.sql` adds an outbox foundation;
+it snapshots only a receipt identity reference, never a bearer URL/token. V1
+still has no WhatsApp provider, outbound sender, OTP, member point portal
+session, campaign, or customer app. A future sender must resolve a fresh
+customer URL transiently and remain asynchronous/outside checkout success.
 
 The runtime matrix is `bash tests/staging/run-member-points-pg15.sh`; it applies
-migrations 476000–479000 and rolls all receipt fixtures back on a disposable
-PostgreSQL 15 cluster.
+migrations 476000–480000 on a disposable PostgreSQL 15 cluster that is destroyed
+after all Member, loyalty, receipt, and WhatsApp fixtures complete.
