@@ -96,11 +96,13 @@ shows the generic registration QR only to OWNER and only when
 opens the generic landing page and does not identify a Member.
 
 Customer point portal sessions, external WhatsApp OTP/receipts, customer-facing
-personal card access, digital receipt links, and asynchronous notification
-delivery remain deferred until a verified customer access channel and receipt
-token contract are implemented. The customer roadmap is mobile web plus
-WhatsApp, not an installable customer app. See `docs/POS.md` and
-`docs/DATABASE.md` for lookup and grant boundaries.
+personal card access, and asynchronous notification delivery remain deferred.
+Secure digital receipts are implemented for completed native sales; their
+Member and point summary is sourced only from the sale-linked immutable ledger
+snapshots. No current loyalty policy is used to recalculate a receipt. The
+customer roadmap is mobile web plus WhatsApp, not an installable customer app.
+See `docs/DIGITAL_RECEIPTS.md`, `docs/POS.md`, and `docs/DATABASE.md` for receipt
+and access boundaries.
 
 No earn or redemption rate is seeded as business truth. Member identity and
 history remain usable while the program is OFF; disabling it preserves every

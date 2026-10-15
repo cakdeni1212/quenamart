@@ -103,6 +103,26 @@ settings. Member detail displays a staff-only QR containing the POS lookup
 token; it is an identifier, never an authenticated web credential.
 
 The points page deliberately does not accept a phone number or reveal a
-balance: verified WhatsApp/OTP delivery is not configured. Customer portal
-sessions, digital receipt links, and asynchronous WhatsApp receipt delivery
-are deferred; checkout never calls a messaging provider.
+balance: verified WhatsApp/OTP delivery is not configured. Customer point
+portal sessions and asynchronous WhatsApp receipt delivery are deferred;
+checkout never calls a messaging provider. Secure digital receipts are
+available separately for completed native sales; see
+[`DIGITAL_RECEIPTS.md`](DIGITAL_RECEIPTS.md).
+
+## Digital Receipt V1
+
+Migration `20260929479000_digital_receipt_v1.sql` creates a hash-only,
+revocable receipt identity for each newly completed `QUENA_POS` sale. It does
+not backfill historical sales or create identities for `IPOS_IMPORT`. Staff
+issue or rotate a 256-bit random link from authorized native transaction detail;
+the database stores only SHA-256 and the customer route resolves exact matches
+through a service-only narrow projection. Checkout does not need a public link
+or external delivery to succeed. Public pages are dynamic and no-store.
+
+The receipt uses sale-time product/tender/loyalty evidence. Outlet presentation
+fields (display name, address, phone, footer) use current receipt settings where
+older sale snapshots do not exist. The public view excludes member contact
+details, internal identifiers, payment references, and all costing/profit
+fields. Staff can open a relative link locally; a shareable absolute HTTPS URL
+requires `NEXT_PUBLIC_APP_URL`. No provider, notification queue, or WhatsApp
+send is implemented.

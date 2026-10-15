@@ -40,7 +40,9 @@ SQL
 "${PSQL[@]}" -f "$ROOT/tests/staging/member-points-runtime-prerequisites.sql" >/dev/null
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929477000_member_loyalty_policy_v1.sql" >"$TMP/migration.log"
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929478000_member_public_access_foundation_v1.sql" >"$TMP/access-migration.log"
+"${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929479000_digital_receipt_v1.sql" >"$TMP/receipt-migration.log"
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-member-points-policy.sql" >"$TMP/runtime.log"
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-member-public-access.sql" >"$TMP/access-runtime.log"
-cat "$TMP/migration.log" "$TMP/access-migration.log" "$TMP/runtime.log" "$TMP/access-runtime.log"
-echo 'PASS: 476000 + 477000 + 478000 apply and loyalty/public-access matrices ran on disposable PostgreSQL 15; cluster removed on exit'
+"${PSQL[@]}" -f "$ROOT/tests/staging/runtime-digital-receipt.sql" >"$TMP/receipt-runtime.log"
+cat "$TMP/migration.log" "$TMP/access-migration.log" "$TMP/receipt-migration.log" "$TMP/runtime.log" "$TMP/access-runtime.log" "$TMP/receipt-runtime.log"
+echo 'PASS: 476000-479000 apply and loyalty/public-access/digital-receipt matrices ran on disposable PostgreSQL 15; cluster removed on exit'

@@ -331,6 +331,11 @@ OWNER/ADMIN/KASIR RPC that creates the Member, consent evidence, and cart
 association atomically. POS lookup output is bounded and masks phone; exact
 opaque-token matches remain identifier-only and do not authorize public reads.
 
-No OTP, customer portal session, public point-history RPC, receipt token, or
-WhatsApp notification queue exists yet. `/member-quena/cek` fails closed until
-a verified customer access mechanism is implemented. See `docs/LOYALTY.md`.
+No OTP, customer portal session, public point-history RPC, or WhatsApp
+notification queue exists yet. `/member-quena/cek` fails closed until a
+verified customer access mechanism is implemented. Digital receipt access is
+implemented separately by migration `20260929479000_digital_receipt_v1.sql`:
+one hash-only token identity per newly completed `QUENA_POS` sale, exact-token
+service-only resolution, and no anonymous table grants. It does not backfill
+historical sales or cover `IPOS_IMPORT`. See `docs/DIGITAL_RECEIPTS.md` and
+`docs/LOYALTY.md`.

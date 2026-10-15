@@ -12,6 +12,8 @@ CREATE TABLE public.pos_cart_items(id uuid PRIMARY KEY DEFAULT gen_random_uuid()
 CREATE TYPE public.pos_sale_payment_method AS ENUM('CASH','QRIS','CARD','E_WALLET');
 CREATE TYPE public.inventory_cost_authority_status AS ENUM('INACTIVE','WAC_ACTIVE');
 ALTER TABLE public.sales ADD COLUMN subtotal numeric(32,2) NOT NULL DEFAULT 0;
+-- Match the deployed sales identity constraint used by outlet-scoped receipt access.
+ALTER TABLE public.sales ADD CONSTRAINT sales_id_outlet_unique UNIQUE(id,outlet_id);
 ALTER TABLE public.sales ADD COLUMN discount_total numeric(32,2) NOT NULL DEFAULT 0 CONSTRAINT sales_discount_total_check CHECK(discount_total=0);
 ALTER TABLE public.sales ADD COLUMN cashier_id uuid, ADD COLUMN completed_by uuid, ADD COLUMN checkout_request_id uuid, ADD COLUMN sale_number text, ADD COLUMN checkout_request_id_dummy uuid;
 CREATE TABLE public.pos_checkout_requests(request_id uuid PRIMARY KEY,actor_id uuid,outlet_id uuid,cart_id uuid,expected_cart_revision bigint,payment_payload_hash text,state text,sale_id uuid,result jsonb,completed_at timestamptz);

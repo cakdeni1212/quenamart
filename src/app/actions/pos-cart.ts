@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash, randomBytes } from "node:crypto";
 import { getProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { PosPaymentMethod } from "@/lib/settings/pos-shared";
@@ -215,6 +216,39 @@ export async function readPosSaleReceipt(saleId: string): Promise<PosResult> {
     return { ok: false, code: "POS_RECEIPT_NOT_FOUND", message: "Struk tidak tersedia untuk akun ini." };
   }
   return result;
+}
+
+export type DigitalReceiptLinkResult =
+  | { ok: true; path: string; publicUrl: string | null; publicUrlConfigured: boolean }
+  | { ok: false; message: string };
+
+export async function issueDigitalReceiptLink(saleId: string): Promise<DigitalReceiptLinkResult> {
+  if (!validUuid(saleId)) return { ok: false, message: "Struk digital tidak tersedia untuk transaksi ini." };
+  try {
+    const context = await allowedClient();
+    if (!context) return { ok: false, message: messageFor("POS_CART_ACCESS_DENIED") };
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(token, "utf8").digest("hex");
+    const { data, error } = await context.supabase.rpc("pos_sale_public_receipt_issue", { p_sale_id: saleId, p_token_hash: tokenHash });
+    if (error || !record(data) || data.ok !== true) {
+      return { ok: false, message: "Tautan struk tidak dapat dibuat untuk transaksi ini." };
+    }
+    const path = `/struk/${token}`;
+    const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (!configured) return { ok: true, path, publicUrl: null, publicUrlConfigured: false };
+    try {
+      const origin = new URL(configured);
+      if (origin.protocol !== "https:" || origin.username || origin.password) {
+        return { ok: true, path, publicUrl: null, publicUrlConfigured: false };
+      }
+      return { ok: true, path, publicUrl: new URL(path, origin).toString(), publicUrlConfigured: true };
+    } catch {
+      return { ok: true, path, publicUrl: null, publicUrlConfigured: false };
+    }
+  } catch (error) {
+    console.error("[issueDigitalReceiptLink] issuance failed", { name: error instanceof Error ? error.name : "unknown" });
+    return { ok: false, message: "Tautan struk tidak dapat dibuat untuk transaksi ini." };
+  }
 }
 
 export async function ensureActivePosCart(): Promise<PosResult> {
