@@ -95,55 +95,59 @@ export default async function WhatsAppCenterPage() {
       </header>
 
       <div className={styles.dashboardGrid}>
-        <section className={connectionClass} aria-labelledby="connection-title">
-          <div className={styles.connectionIcon}><StatusIcon /></div>
-          <div className={styles.connectionCopy}>
-            <span className={styles.sectionEyebrow}>STATUS KONEKSI</span>
-            <h2 id="connection-title">{summary ? summary.provider_state === "CONNECTED" ? "WhatsApp terhubung" : "WhatsApp belum terhubung" : "Status koneksi belum tersedia"}</h2>
-            <p>{summary ? notConfigured ? "Provider belum dikonfigurasi. Tidak ada pesan yang dikirim atau antrean yang diproses." : "Status provider: " + providerLabel(summary.provider_state) + "." : summaryResult.error}</p>
-          </div>
-          <div className={styles.connectionAction}>
-            {summary && <span className={styles.statusPill + (notConfigured ? " " + styles.statusWarning : summary.provider_state === "CONNECTED" ? " " + styles.statusSuccess : "")}>{providerLabel(summary.provider_state)}</span>}
-            <Link href="/pengaturan/whatsapp" className={styles.primaryLink}>Buka Pengaturan</Link>
-          </div>
-        </section>
+        <main className={styles.dashboardMain}>
+          <section className={connectionClass} aria-labelledby="connection-title">
+            <div className={styles.connectionIcon}><StatusIcon /></div>
+            <div className={styles.connectionCopy}>
+              <span className={styles.sectionEyebrow}>STATUS KONEKSI</span>
+              <h2 id="connection-title">{summary ? summary.provider_state === "CONNECTED" ? "WhatsApp terhubung" : "WhatsApp belum terhubung" : "Status koneksi belum tersedia"}</h2>
+              <p>{summary ? notConfigured ? "Provider belum dikonfigurasi. Tidak ada pesan yang dikirim atau antrean yang diproses." : "Status provider: " + providerLabel(summary.provider_state) + "." : summaryResult.error}</p>
+            </div>
+            <div className={styles.connectionAction}>
+              {summary && <span className={styles.statusPill + (notConfigured ? " " + styles.statusWarning : summary.provider_state === "CONNECTED" ? " " + styles.statusSuccess : "")}>{providerLabel(summary.provider_state)}</span>}
+              <Link href="/pengaturan/whatsapp" className={styles.primaryLink}>Buka Pengaturan</Link>
+            </div>
+          </section>
 
-        {summary ? <section className={styles.metricGrid} aria-label="Ringkasan pengiriman">
-          <MetricCard kind="sent" label="Terkirim hari ini" value={summary.today_sent.toLocaleString("id-ID")} note={summary.today_sent ? "Pesan selesai hari ini" : "Tidak ada perubahan"} />
-          <MetricCard kind="queue" label="Antrean" value={summary.pending.toLocaleString("id-ID")} note={summary.pending ? "Menunggu diproses" : "Tidak ada perubahan"} />
-          <MetricCard kind="failed" label="Gagal" value={summary.failed.toLocaleString("id-ID")} note={summary.failed ? "Perlu ditinjau" : "Tidak ada perubahan"} />
-          <MetricCard kind="oldest" label="Antrean tertua" value={dateTime(summary.oldest_pending_at)} note={summary.oldest_pending_at ? "Waktu dibuat" : "Belum ada antrean"} compact />
-        </section> : <div className={styles.dataError} role="alert">{summaryResult.error}</div>}
+          {summary ? <section className={styles.metricGrid} aria-label="Ringkasan pengiriman">
+            <MetricCard kind="sent" label="Terkirim hari ini" value={summary.today_sent.toLocaleString("id-ID")} note={summary.today_sent ? "Pesan selesai hari ini" : "Tidak ada perubahan"} />
+            <MetricCard kind="queue" label="Antrean" value={summary.pending.toLocaleString("id-ID")} note={summary.pending ? "Menunggu diproses" : "Tidak ada perubahan"} />
+            <MetricCard kind="failed" label="Gagal" value={summary.failed.toLocaleString("id-ID")} note={summary.failed ? "Perlu ditinjau" : "Tidak ada perubahan"} />
+            <MetricCard kind="oldest" label="Antrean tertua" value={dateTime(summary.oldest_pending_at)} note={summary.oldest_pending_at ? "Waktu dibuat" : "Belum ada antrean"} compact />
+          </section> : <div className={styles.dataError} role="alert">{summaryResult.error}</div>}
 
-        {settings ? <WhatsAppCenterControls key={[settings.outlet_id, settings.updated_at ?? "", settings.whatsapp_transactions_enabled, settings.automatic_receipt_enabled, settings.include_points_earned, settings.include_points_redeemed, settings.include_points_balance, settings.provider_state, settings.public_url_ready].join(":")} settings={settings} canEdit={profile.role === "OWNER"} /> : <aside className={styles.quickCard} role="alert"><h2>Pengaturan Cepat</h2><p>{settingsResult.error}</p><Link href="/pengaturan/whatsapp" className={styles.secondaryLink}>Buka Pengaturan Lengkap</Link></aside>}
+          <section className={styles.historyCard} aria-labelledby="history-title">
+            <header className={styles.historyHeader}>
+              <div><h2 id="history-title">Riwayat Pengiriman</h2><p>Menampilkan hingga 50 notifikasi terbaru.</p></div>
+              <RefreshButton />
+            </header>
+            <div className={styles.tableScroller}>
+              <table className={styles.historyTable}>
+                <thead><tr><th>WAKTU</th><th>PELANGGAN</th><th>TRANSAKSI</th><th>JENIS</th><th>STATUS</th><th>PESAN</th></tr></thead>
+                <tbody>{summary?.recent.length ? summary.recent.map((item) => <tr key={item.id}>
+                  <td>{dateTime(item.sent_at ?? item.created_at)}</td>
+                  <td><span className={styles.customerCell}>{item.customer_name}</span><small>{item.destination_masked}</small></td>
+                  <td>{item.sale_number}</td>
+                  <td>WhatsApp</td>
+                  <td><span className={styles.deliveryStatus + (item.status === "SENT" ? " " + styles.deliverySent : item.status === "FAILED" ? " " + styles.deliveryFailed : "")}>{statusLabel(item.status)}</span></td>
+                  <td>Struk digital</td>
+                </tr>) : <tr><td colSpan={6} className={styles.emptyCell}><div className={styles.emptyState}><span className={styles.emptyIcon}><CardIcon kind="empty" /></span><strong>{summary ? "Belum ada notifikasi WhatsApp." : "Riwayat belum dapat dimuat."}</strong><span>{summary ? "Notifikasi akan muncul di sini setelah transaksi memenuhi syarat dan pengiriman otomatis diaktifkan." : summaryResult.error}</span></div></td></tr>}</tbody>
+              </table>
+            </div>
+          </section>
+        </main>
 
-        <section className={styles.historyCard} aria-labelledby="history-title">
-          <header className={styles.historyHeader}>
-            <div><h2 id="history-title">Riwayat Pengiriman</h2><p>Menampilkan hingga 50 notifikasi terbaru.</p></div>
-            <RefreshButton />
-          </header>
-          <div className={styles.tableScroller}>
-            <table className={styles.historyTable}>
-              <thead><tr><th>WAKTU</th><th>PELANGGAN</th><th>TRANSAKSI</th><th>JENIS</th><th>STATUS</th><th>PESAN</th></tr></thead>
-              <tbody>{summary?.recent.length ? summary.recent.map((item) => <tr key={item.id}>
-                <td>{dateTime(item.sent_at ?? item.created_at)}</td>
-                <td><span className={styles.customerCell}>{item.customer_name}</span><small>{item.destination_masked}</small></td>
-                <td>{item.sale_number}</td>
-                <td>WhatsApp</td>
-                <td><span className={styles.deliveryStatus + (item.status === "SENT" ? " " + styles.deliverySent : item.status === "FAILED" ? " " + styles.deliveryFailed : "")}>{statusLabel(item.status)}</span></td>
-                <td>Struk digital</td>
-              </tr>) : <tr><td colSpan={6} className={styles.emptyCell}><div className={styles.emptyState}><span className={styles.emptyIcon}><CardIcon kind="empty" /></span><strong>{summary ? "Belum ada notifikasi WhatsApp." : "Riwayat belum dapat dimuat."}</strong><span>{summary ? "Notifikasi akan muncul di sini setelah transaksi memenuhi syarat dan pengiriman otomatis diaktifkan." : summaryResult.error}</span></div></td></tr>}</tbody>
-            </table>
-          </div>
-        </section>
+        <aside className={styles.dashboardSidebar}>
+          {settings ? <WhatsAppCenterControls key={[settings.outlet_id, settings.updated_at ?? "", settings.whatsapp_transactions_enabled, settings.automatic_receipt_enabled, settings.include_points_earned, settings.include_points_redeemed, settings.include_points_balance, settings.provider_state, settings.public_url_ready].join(":")} settings={settings} canEdit={profile.role === "OWNER"} /> : <section className={styles.quickCard} role="alert"><h2>Pengaturan Cepat</h2><p>{settingsResult.error}</p><Link href="/pengaturan/whatsapp" className={styles.secondaryLink}>Buka Pengaturan Lengkap</Link></section>}
 
-        <aside className={styles.connectionInfo} aria-labelledby="connection-info-title">
-          <header><span className={styles.asideIcon}><CardIcon kind="receipt" /></span><h2 id="connection-info-title">Informasi Koneksi</h2></header>
-          <InfoRow label="Provider" value={summary ? providerLabel(summary.provider_state) : "Belum tersedia"} />
-          <InfoRow label="Status" value={summary?.provider_state ?? "Belum tersedia"} code />
-          <InfoRow label="URL publik" value={settings ? publicUrlReady ? "Siap" : "Belum dikonfigurasi" : "Belum tersedia"} />
-          <InfoRow label="Otomatisasi" value={summary ? automationReady ? "Aktif" : summary.automation_enabled ? "Menunggu kesiapan" : "Nonaktif" : "Belum tersedia"} />
-          <Link href="/pengaturan/whatsapp" className={styles.settingsLink}><CardIcon kind="settings" />Buka Pengaturan Lengkap</Link>
+          <section className={styles.connectionInfo} aria-labelledby="connection-info-title">
+            <header><span className={styles.asideIcon}><CardIcon kind="receipt" /></span><h2 id="connection-info-title">Informasi Koneksi</h2></header>
+            <InfoRow label="Provider" value={summary ? providerLabel(summary.provider_state) : "Belum tersedia"} />
+            <InfoRow label="Status" value={summary?.provider_state ?? "Belum tersedia"} code />
+            <InfoRow label="URL publik" value={settings ? publicUrlReady ? "Siap" : "Belum dikonfigurasi" : "Belum tersedia"} />
+            <InfoRow label="Otomatisasi" value={summary ? automationReady ? "Aktif" : summary.automation_enabled ? "Menunggu kesiapan" : "Nonaktif" : "Belum tersedia"} />
+            <Link href="/pengaturan/whatsapp" className={styles.settingsLink}><CardIcon kind="settings" />Buka Pengaturan Lengkap</Link>
+          </section>
         </aside>
       </div>
     </main>

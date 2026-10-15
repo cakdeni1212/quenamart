@@ -60,7 +60,7 @@ export function WhatsAppCenterControls({ settings, canEdit }: { settings: WhatsA
   }
 
   return (
-    <aside className={styles.quickCard} aria-labelledby="quick-settings-title">
+    <section className={styles.quickCard} aria-labelledby="quick-settings-title">
       <header className={styles.sidebarHeading}>
         <span className={styles.asideIcon}><SettingsIcon /></span>
         <h2 id="quick-settings-title">Pengaturan Cepat</h2>
@@ -95,7 +95,7 @@ export function WhatsAppCenterControls({ settings, canEdit }: { settings: WhatsA
       {!canEdit && <p className={styles.readOnlyHint}>ADMIN dapat melihat pengaturan. Perubahan hanya dapat disimpan oleh OWNER.</p>}
       {notice && <p role={notice.ok ? "status" : "alert"} className={notice.ok ? styles.noticeSuccess : styles.noticeError}>{notice.text}</p>}
       {canEdit && <button type="button" className={styles.saveButton} disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Menyimpan…" : "Simpan Perubahan"}</button>}
-    </aside>
+    </section>
   );
 }
 

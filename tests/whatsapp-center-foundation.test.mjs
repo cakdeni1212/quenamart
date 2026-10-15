@@ -90,7 +90,8 @@ test("WhatsApp Center uses the existing summary/settings contracts and retains r
 test("WhatsApp Center dashboard has responsive two-column and mobile ordering", async () => {
   const css = await readFile(new URL("../src/components/notifications/whatsapp-center.module.css", import.meta.url), "utf8");
   assert.match(css, /grid-template-columns:minmax\(0,3fr\) minmax\(300px,1fr\)/);
-  assert.match(css, /grid-template-areas:"status quick" "metrics quick" "history info"/);
+  assert.match(css, /\.dashboardMain,\.dashboardSidebar\{[\s\S]*?display:flex;[\s\S]*?flex-direction:column;[\s\S]*?gap:18px/);
   assert.match(css, /"status" "metrics" "quick" "info" "history"/);
   assert.match(css, /overflow-x:auto/);
+  assert.match(css, /\.settingsLink\{[^}]*width:100%[^}]*min-height:42px/);
 });

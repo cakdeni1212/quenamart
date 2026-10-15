@@ -4,12 +4,16 @@
 .dashboardGrid{
   display:grid;
   grid-template-columns:minmax(0,3fr) minmax(300px,1fr);
-  grid-template-areas:"status quick" "metrics quick" "history info";
   align-items:start;
-  gap:14px;
+  gap:18px;
+}
+.dashboardMain,.dashboardSidebar{
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  gap:18px;
 }
 .connectionCard{
-  grid-area:status;
   display:grid;
   grid-template-columns:42px minmax(0,1fr) auto;
   align-items:center;
@@ -49,9 +53,9 @@
 }
 .primaryLink{min-height:35px;border-radius:8px;background:#315b38;padding:0 13px;color:white;font-size:10px}
 .primaryLink:hover{background:#274c2e}
-.metricGrid{grid-area:metrics;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}
+.metricGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}
 .metricCard{
-  display:grid;min-width:0;min-height:135px;align-content:start;justify-items:start;gap:7px;
+  display:grid;min-width:0;align-content:start;justify-items:start;gap:7px;
   border:1px solid #e7ebe4;border-radius:12px;background:#fff;padding:13px 14px;
 }
 .metricIcon{width:29px;height:29px;border-radius:9px;background:#f0f4eb;color:#5e7c58}
@@ -66,7 +70,7 @@
 .quickCard,.connectionInfo,.historyCard{
   min-width:0;border:1px solid #e7ebe4;border-radius:14px;background:#fff;
 }
-.quickCard{grid-area:quick;padding:17px 17px 15px}
+.quickCard{padding:17px 17px 15px}
 .sidebarHeading,.connectionInfo>header{display:flex;align-items:center;gap:10px}
 .asideIcon{width:31px;height:31px;background:#f1f5ed;color:#66815f}
 .asideIcon svg{width:16px;height:16px}
@@ -91,7 +95,7 @@
 .noticeSuccess,.noticeError{margin:10px 0 0;border:1px solid;border-radius:8px;padding:8px 9px;font-size:9px;line-height:1.45}
 .noticeSuccess{border-color:#dce8d7;background:#f4f8f1;color:#4f704a}
 .noticeError{border-color:#f0d8d4;background:#fff6f4;color:#9b5147}
-.historyCard{grid-area:history;overflow:hidden}
+.historyCard{overflow:hidden}
 .historyHeader{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 18px 14px}
 .historyHeader h2{margin:0;color:#2d3b2f;font-size:13px;font-weight:660}
 .historyHeader p{margin:4px 0 0;color:#929b90;font-size:9px}
@@ -117,20 +121,26 @@
 .emptyIcon svg{width:16px;height:16px}
 .emptyState strong{color:#586555;font-size:10px;font-weight:620}
 .emptyState>span:last-child{color:#929b90;font-size:8px;line-height:1.5}
-.connectionInfo{grid-area:info;padding:16px 17px}
+.connectionInfo{padding:16px 17px}
 .connectionInfo>header{margin-bottom:12px}
 .infoRow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:37px;border-top:1px solid #edf0eb}
 .infoRow>span{color:#838d81;font-size:9px}
 .infoRow>strong{color:#4d5b4b;font-size:9px;font-weight:620;text-align:right}
 .infoRow>strong.codeValue{border-radius:5px;background:#f4f5f2;padding:4px 6px;color:#798275;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px}
-.settingsLink{gap:7px;min-height:35px;margin-top:10px;border:1px solid #e4e9e2;border-radius:8px;color:#52694e;font-size:9px}
+.settingsLink{box-sizing:border-box;width:100%;gap:8px;min-height:42px;margin-top:14px;border:1px solid #e4e9e2;border-radius:8px;padding:0 14px;color:#52694e;font-size:9px;white-space:nowrap}
 .settingsLink:hover{background:#f8faf6}
 .settingsLink svg{width:14px;height:14px}
-.dataError{grid-area:metrics;border:1px solid #eedfd2;border-radius:10px;background:#fffaf5;padding:14px;color:#916a48;font-size:10px}
-.dashboardGrid>aside[role=alert]{grid-area:quick}
+.dataError{border:1px solid #eedfd2;border-radius:10px;background:#fffaf5;padding:14px;color:#916a48;font-size:10px}
 
 @media(max-width:1120px){
-  .dashboardGrid{grid-template-columns:minmax(0,1fr);grid-template-areas:"status" "metrics" "quick" "info" "history"}
+  .dashboardGrid{grid-template-columns:minmax(0,1fr);gap:14px}
+  .dashboardMain,.dashboardSidebar{display:contents}
+  .connectionCard{grid-area:status}
+  .metricGrid,.dataError{grid-area:metrics}
+  .quickCard{grid-area:quick}
+  .connectionInfo{grid-area:info}
+  .historyCard{grid-area:history}
+  .dashboardGrid{grid-template-areas:"status" "metrics" "quick" "info" "history"}
 }
 @media(max-width:700px){
   .pageHeading{margin-bottom:18px}
@@ -143,7 +153,7 @@
   .connectionCopy p{font-size:9px}
   .connectionAction{grid-column:2;display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:2px}
   .metricGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .metricCard{min-height:123px;padding:11px}
+  .metricCard{padding:11px}
   .historyHeader{align-items:flex-start;padding:14px}
   .historyHeader h2{font-size:12px}
   .refreshButton{flex:none}
