@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { canAccessSection } from "@/lib/auth/roles";
 import { requireProfile } from "@/lib/auth/session";
 import { readWhatsAppSettings, readWhatsAppSummary } from "@/lib/notifications/whatsapp.server";
+import { readWhatsAppProviderStatus } from "@/app/actions/whatsapp-provider";
+import { WhatsAppConnectionControls } from "@/components/notifications/whatsapp-connection-controls";
 import { RefreshButton, WhatsAppCenterControls } from "@/components/notifications/whatsapp-center-controls";
 import styles from "@/components/notifications/whatsapp-center.module.css";
 
@@ -10,17 +12,6 @@ function dateTime(value: string | null) {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function providerLabel(value: string) {
-  return ({
-    NOT_CONFIGURED: "Belum dikonfigurasi",
-    DISCONNECTED: "Terputus",
-    CONNECTING: "Menghubungkan",
-    CONNECTED: "Terhubung",
-    DEGRADED: "Gangguan",
-    ERROR: "Perlu diperiksa",
-  } as Record<string, string>)[value] ?? "Belum tersedia";
 }
 
 function statusLabel(value: string) {
@@ -54,10 +45,6 @@ function publicHttpsConfigured() {
   }
 }
 
-function StatusIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20l1-4.7a8.5 8.5 0 1 1 16.5-3.6Z"/><path d="M8.8 8.3c.4 2.3 2.2 4.1 4.5 4.6"/></svg>;
-}
-
 function MetricIcon({ kind }: { kind: "sent" | "queue" | "failed" | "oldest" }) {
   if (kind === "sent") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.2 4.2L19 6.5"/></svg>;
   if (kind === "queue") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/><circle cx="3" cy="6" r=".5"/><circle cx="3" cy="12" r=".5"/><circle cx="3" cy="18" r=".5"/></svg>;
@@ -74,15 +61,15 @@ export default async function WhatsAppCenterPage() {
   const profile = await requireProfile();
   if (!canAccessSection(profile.role, "whatsapp")) redirect("/dashboard");
 
-  const [summaryResult, settingsResult] = await Promise.all([readWhatsAppSummary(), readWhatsAppSettings()]);
+  const [summaryResult, settingsResult, providerResult] = await Promise.all([readWhatsAppSummary(), readWhatsAppSettings(), readWhatsAppProviderStatus()]);
   const summary = summaryResult.summary;
   const settings = settingsResult.settings;
-  const notConfigured = summary?.provider_state === "NOT_CONFIGURED";
+  const providerStatus = providerResult.ok ? providerResult.status : null;
+  const providerState = providerStatus?.connection_state ?? summary?.provider_state ?? "NOT_CONFIGURED";
   const publicUrlReady = publicHttpsConfigured() && settings?.public_url_ready === true;
   const automationReady = summary?.automation_enabled === true
-    && summary.provider_state === "CONNECTED"
+    && providerState === "CONNECTED"
     && publicUrlReady;
-  const connectionClass = styles.connectionCard + (notConfigured ? " " + styles.connectionWarning : summary?.provider_state === "CONNECTED" ? " " + styles.connectionReady : "");
 
   return (
     <main className="page-content">
@@ -96,18 +83,7 @@ export default async function WhatsAppCenterPage() {
 
       <div className={styles.dashboardGrid}>
         <main className={styles.dashboardMain}>
-          <section className={connectionClass} aria-labelledby="connection-title">
-            <div className={styles.connectionIcon}><StatusIcon /></div>
-            <div className={styles.connectionCopy}>
-              <span className={styles.sectionEyebrow}>STATUS KONEKSI</span>
-              <h2 id="connection-title">{summary ? summary.provider_state === "CONNECTED" ? "WhatsApp terhubung" : "WhatsApp belum terhubung" : "Status koneksi belum tersedia"}</h2>
-              <p>{summary ? notConfigured ? "Provider belum dikonfigurasi. Tidak ada pesan yang dikirim atau antrean yang diproses." : "Status provider: " + providerLabel(summary.provider_state) + "." : summaryResult.error}</p>
-            </div>
-            <div className={styles.connectionAction}>
-              {summary && <span className={styles.statusPill + (notConfigured ? " " + styles.statusWarning : summary.provider_state === "CONNECTED" ? " " + styles.statusSuccess : "")}>{providerLabel(summary.provider_state)}</span>}
-              <Link href="/pengaturan/whatsapp" className={styles.primaryLink}>Buka Pengaturan</Link>
-            </div>
-          </section>
+          <WhatsAppConnectionControls initialStatus={providerStatus} canControl={profile.role === "OWNER"} />
 
           {summary ? <section className={styles.metricGrid} aria-label="Ringkasan pengiriman">
             <MetricCard kind="sent" label="Terkirim hari ini" value={summary.today_sent.toLocaleString("id-ID")} note={summary.today_sent ? "Pesan selesai hari ini" : "Tidak ada perubahan"} />
@@ -142,8 +118,8 @@ export default async function WhatsAppCenterPage() {
 
           <section className={styles.connectionInfo} aria-labelledby="connection-info-title">
             <header><span className={styles.asideIcon}><CardIcon kind="receipt" /></span><h2 id="connection-info-title">Informasi Koneksi</h2></header>
-            <InfoRow label="Provider" value={summary ? providerLabel(summary.provider_state) : "Belum tersedia"} />
-            <InfoRow label="Status" value={summary?.provider_state ?? "Belum tersedia"} code />
+            <InfoRow label="Provider" value={providerState === "NOT_CONFIGURED" ? "Belum dikonfigurasi" : "QR Session"} />
+            <InfoRow label="Status" value={providerState} code />
             <InfoRow label="URL publik" value={settings ? publicUrlReady ? "Siap" : "Belum dikonfigurasi" : "Belum tersedia"} />
             <InfoRow label="Otomatisasi" value={summary ? automationReady ? "Aktif" : summary.automation_enabled ? "Menunggu kesiapan" : "Nonaktif" : "Belum tersedia"} />
             <Link href="/pengaturan/whatsapp" className={styles.settingsLink}><CardIcon kind="settings" />Buka Pengaturan Lengkap</Link>

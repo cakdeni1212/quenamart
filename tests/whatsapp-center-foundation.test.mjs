@@ -44,7 +44,7 @@ test("settings update is owner-only and emits bounded field audit evidence", () 
 test("server action and settings form enforce the owner mutation boundary", () => {
   assert.match(settings, /canEdit/);
   assert.match(settings, /Simpan Perubahan/);
-  assert.match(settings, /Provider belum dikonfigurasi/);
+  assert.match(settings, /effectiveProviderState === "CONNECTED"/);
 });
 
 test("unconfigured provider makes no network calls and never requests queued work", () => {

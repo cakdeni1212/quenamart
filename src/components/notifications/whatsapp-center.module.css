@@ -42,6 +42,11 @@
 .connectionCopy h2{margin:5px 0 4px;color:#26372a;font-size:17px;font-weight:650;letter-spacing:-.3px}
 .connectionCopy p{margin:0;color:#7c877b;font-size:10px;line-height:1.55}
 .connectionAction{display:grid;justify-items:end;gap:10px}
+.qrPanel{display:grid;justify-items:center;gap:10px;margin-top:16px;border:1px solid #e6eae3;border-radius:12px;background:#fbfcfa;padding:14px}
+.qrPanel img{max-width:100%;height:auto;border-radius:8px;background:#fff}
+.qrPanel ol{align-self:start;margin:0;padding-left:22px;color:#52604f;font-size:10px;line-height:1.8}
+.qrPanel small{color:#8b746f;font-size:9px;text-align:center}
+.qrPlaceholder{display:grid;width:260px;height:260px;max-width:100%;place-items:center;border:1px dashed #cad4c5;border-radius:8px;background:white;color:#798275;font-size:11px}
 .statusPill,.deliveryStatus{
   display:inline-flex;align-items:center;border-radius:999px;background:#f0f2ee;padding:6px 10px;
   color:#70796e;font-size:9px;font-weight:650;white-space:nowrap;
@@ -53,6 +58,7 @@
 }
 .primaryLink{min-height:35px;border-radius:8px;background:#315b38;padding:0 13px;color:white;font-size:10px}
 .primaryLink:hover{background:#274c2e}
+.primaryLink:disabled,.secondaryLink:disabled{cursor:not-allowed;opacity:.55}
 .metricGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}
 .metricCard{
   display:grid;min-width:0;align-content:start;justify-items:start;gap:7px;

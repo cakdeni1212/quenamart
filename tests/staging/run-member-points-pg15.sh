@@ -42,11 +42,13 @@ SQL
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929478000_member_public_access_foundation_v1.sql" >"$TMP/access-migration.log"
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929479000_digital_receipt_v1.sql" >"$TMP/receipt-migration.log"
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/20260929480000_whatsapp_center_foundation_v1.sql" >"$TMP/whatsapp-migration.log"
+"${PSQL[@]}" -f "$ROOT/supabase/migrations/20261016100000_whatsapp_qr_session_provider_v1.sql" >"$TMP/whatsapp-qr-migration.log"
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-member-points-policy.sql" >"$TMP/runtime.log"
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-member-public-access.sql" >"$TMP/access-runtime.log"
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-digital-receipt.sql" >"$TMP/receipt-runtime.log"
 cat "$TMP/migration.log" "$TMP/access-migration.log" "$TMP/receipt-migration.log" "$TMP/whatsapp-migration.log" "$TMP/runtime.log" "$TMP/access-runtime.log" "$TMP/receipt-runtime.log"
 "$ROOT/tests/staging/runtime-whatsapp-queue-concurrency.sh" "$PORT" "$USER" quena_member_loyalty_runtime
 "${PSQL[@]}" -f "$ROOT/tests/staging/runtime-whatsapp-queue-lifecycle.sql" >"$TMP/whatsapp-queue.log"
-cat "$TMP/whatsapp-queue.log"
-echo 'PASS: 476000-480000 apply and Member/Loyalty/Digital Receipt/WhatsApp matrices ran on disposable PostgreSQL 15; cluster removed on exit'
+"${PSQL[@]}" -f "$ROOT/tests/staging/runtime-whatsapp-qr-session.sql" >"$TMP/whatsapp-qr-runtime.log"
+cat "$TMP/whatsapp-queue.log" "$TMP/whatsapp-qr-runtime.log"
+echo 'PASS: 476000-481000 apply and Member/Loyalty/Digital Receipt/WhatsApp QR-session matrices ran on disposable PostgreSQL 15; cluster removed on exit'

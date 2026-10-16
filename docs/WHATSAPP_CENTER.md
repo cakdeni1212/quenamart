@@ -40,9 +40,10 @@ CANCELLED are terminal. Actual WhatsApp sending remains disabled.
 `NEXT_PUBLIC_APP_URL` must be configured to a real public HTTPS origin before
 future outbound messages. Do not use localhost, loopback, or LAN addresses.
 Provider state and URL readiness are infrastructure-owned and cannot be
-changed through the settings UI. The V1 interface does not connect an account.
+changed through the settings UI. The QR Session connection flow is documented
+separately in `WHATSAPP_QR_SESSION.md` and does not send messages.
 
-Not implemented: Meta Cloud API, BSP, QR-session WhatsApp Web, OTP, outbound
+Not implemented: Meta Cloud API, BSP, OTP, outbound
 delivery, AI/chatbot, marketing campaigns, customer app, and retention purge.
 Provider secrets must stay server-side in future secret infrastructure and
 must never enter browser storage, `NEXT_PUBLIC_*`, outbox snapshots, or audit
