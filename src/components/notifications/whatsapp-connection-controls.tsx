@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { readWhatsAppPairingQr, readWhatsAppProviderStatus, requestWhatsAppProviderCommand, type WhatsAppProviderStatus } from "@/app/actions/whatsapp-provider";
+import { readWhatsAppPairingQr, readWhatsAppProviderStatus, requestWhatsAppProviderCommand } from "@/app/actions/whatsapp-provider";
+import type { WhatsAppProviderStatus } from "@/lib/notifications/waha-provider.shared";
 import styles from "@/components/notifications/whatsapp-center.module.css";
 
 const labels: Record<WhatsAppProviderStatus["connection_state"], string> = {
@@ -65,7 +66,7 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
   }
 
   const state = status?.connection_state ?? "NOT_CONFIGURED";
-  const connected = state === "CONNECTED" && status?.worker_active;
+  const connected = state === "CONNECTED" && status?.provider_available;
   const warning = state !== "CONNECTED";
   const cardClass = styles.connectionCard + (warning ? " " + styles.connectionWarning : " " + styles.connectionReady);
   const error = state === "ERROR" || status?.last_error_code === "WORKER_STALE";
@@ -75,8 +76,8 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
     <div className={styles.connectionCopy}>
       <span className={styles.sectionEyebrow}>STATUS KONEKSI</span>
       <h2 id="connection-title">{connected ? "WhatsApp terhubung" : state === "WAITING_QR" ? "Scan QR WhatsApp" : state === "CONNECTING" ? "Menghubungkan WhatsApp..." : error ? "Koneksi WhatsApp bermasalah" : "WhatsApp belum terhubung"}</h2>
-      <p>{connected ? `WhatsApp · ${status.connected_number_masked ?? "Nomor tersamarkan"} · QR Session` : error ? "Worker tidak aktif atau koneksi perlu diperiksa. Status aman ditampilkan tanpa detail teknis." : state === "WAITING_QR" ? `QR berlaku sementara${qrExpiresAt ? ` hingga ${dateTime(qrExpiresAt)}` : ""}.` : state === "CONNECTING" ? "Worker sedang menyambungkan perangkat." : status?.worker_active ? "Worker aktif. Siap menerima permintaan koneksi." : "Worker WhatsApp belum aktif. Jalankan worker untuk memulai pairing."}</p>
-      {connected && <p>Terakhir terhubung: {dateTime(status.last_connected_at)} · Worker aktif</p>}
+      <p>{connected ? `WhatsApp · ${status.connected_number_masked ?? "Nomor tersamarkan"} · QR Session` : error ? "Layanan WAHA belum aktif atau koneksi perlu diperiksa. Status aman ditampilkan tanpa detail teknis." : state === "WAITING_QR" ? `QR berlaku sementara${qrExpiresAt ? ` hingga ${dateTime(qrExpiresAt)}` : ""}.` : state === "CONNECTING" ? "WAHA sedang menyambungkan perangkat." : status?.provider_available ? "WAHA siap menerima permintaan koneksi." : "Layanan WAHA belum aktif atau konfigurasi server belum lengkap."}</p>
+      {connected && status.last_connected_at && <p>Terakhir terhubung: {dateTime(status.last_connected_at)}</p>}
       {notice && <p role="status">{notice}</p>}
       {canControl && state === "WAITING_QR" && <div className={styles.qrPanel}>
         {qrDataUrl ? <Image unoptimized src={qrDataUrl} alt="QR sementara untuk menghubungkan WhatsApp Quena" width={260} height={260} /> : <div className={styles.qrPlaceholder}>Menyiapkan QR aman…</div>}
@@ -88,7 +89,7 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
       <span className={styles.statusPill + (connected ? " " + styles.statusSuccess : " " + styles.statusWarning)}>{labels[state]}</span>
       {canControl && (connected
         ? <button type="button" className={styles.primaryLink} disabled={busy} onClick={() => void command("DISCONNECT")}>{busy ? "Memproses…" : "Putuskan WhatsApp"}</button>
-        : <button type="button" className={styles.primaryLink} disabled={busy || !status?.worker_active || state === "WAITING_QR" || state === "CONNECTING"} onClick={() => void command(state === "ERROR" || state === "DISCONNECTED" ? "RECONNECT" : "CONNECT")}>{busy ? "Mengirim…" : state === "ERROR" || state === "DISCONNECTED" ? "Hubungkan Ulang" : "Hubungkan WhatsApp"}</button>)}
+        : <button type="button" className={styles.primaryLink} disabled={busy || !status?.provider_available || state === "WAITING_QR" || state === "CONNECTING"} onClick={() => void command(state === "ERROR" || state === "DISCONNECTED" ? "RECONNECT" : "CONNECT")}>{busy ? "Mengirim…" : state === "ERROR" || state === "DISCONNECTED" ? "Hubungkan Ulang" : "Hubungkan WhatsApp"}</button>)}
       {canControl && state === "WAITING_QR" && <button type="button" className={styles.secondaryLink} disabled={busy} onClick={() => void command("DISCONNECT")}>Batalkan</button>}
     </div>
   </section>;

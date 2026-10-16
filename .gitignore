@@ -21,6 +21,7 @@
 /build
 /.var/whatsapp/
 /data/whatsapp-session/
+/infra/waha/waha.env
 
 # misc
 .DS_Store

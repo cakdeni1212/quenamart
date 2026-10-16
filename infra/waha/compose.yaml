@@ -1,0 +1,14 @@
+services:
+  waha:
+    image: ${WAHA_IMAGE:-devlikeapro/waha:gows-arm-2026.9.2}
+    restart: unless-stopped
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      WAHA_API_KEY: sha512:${WAHA_API_KEY_SHA512:?Set WAHA_API_KEY_SHA512 in infra/waha/waha.env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
+
+volumes:
+  waha_sessions:

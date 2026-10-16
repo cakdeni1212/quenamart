@@ -23,14 +23,14 @@ function values(settings: WhatsAppSettingsData): WhatsAppSettingsInput {
   };
 }
 
-export function WhatsAppCenterControls({ settings, canEdit }: { settings: WhatsAppSettingsData; canEdit: boolean }) {
+export function WhatsAppCenterControls({ settings, canEdit, effectiveProviderState }: { settings: WhatsAppSettingsData; canEdit: boolean; effectiveProviderState: string }) {
   const router = useRouter();
   const [initial, setInitial] = useState(() => values(settings));
   const [form, setForm] = useState(() => values(settings));
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const dirty = JSON.stringify(initial) !== JSON.stringify(form);
-  const providerReady = settings.provider_state === "CONNECTED" && settings.public_url_ready;
+  const providerReady = effectiveProviderState === "CONNECTED" && settings.public_url_ready;
 
   function update(key: keyof WhatsAppSettingsInput, checked: boolean) {
     setForm((current) => {

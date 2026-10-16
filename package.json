@@ -6,12 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "whatsapp:worker": "node services/whatsapp-worker/index.mjs",
     "lint": "eslint",
     "test:ipos": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test tests/ipos-*.test.mjs"
   },
   "dependencies": {
-    "@chaeulso/baileys": "7.5.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "next": "16.3.6",

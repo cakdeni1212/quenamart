@@ -114,7 +114,7 @@ export default async function WhatsAppCenterPage() {
         </main>
 
         <aside className={styles.dashboardSidebar}>
-          {settings ? <WhatsAppCenterControls key={[settings.outlet_id, settings.updated_at ?? "", settings.whatsapp_transactions_enabled, settings.automatic_receipt_enabled, settings.include_points_earned, settings.include_points_redeemed, settings.include_points_balance, settings.provider_state, settings.public_url_ready].join(":")} settings={settings} canEdit={profile.role === "OWNER"} /> : <section className={styles.quickCard} role="alert"><h2>Pengaturan Cepat</h2><p>{settingsResult.error}</p><Link href="/pengaturan/whatsapp" className={styles.secondaryLink}>Buka Pengaturan Lengkap</Link></section>}
+          {settings ? <WhatsAppCenterControls key={[settings.outlet_id, settings.updated_at ?? "", settings.whatsapp_transactions_enabled, settings.automatic_receipt_enabled, settings.include_points_earned, settings.include_points_redeemed, settings.include_points_balance, providerState, settings.public_url_ready].join(":")} settings={settings} canEdit={profile.role === "OWNER"} effectiveProviderState={providerState} /> : <section className={styles.quickCard} role="alert"><h2>Pengaturan Cepat</h2><p>{settingsResult.error}</p><Link href="/pengaturan/whatsapp" className={styles.secondaryLink}>Buka Pengaturan Lengkap</Link></section>}
 
           <section className={styles.connectionInfo} aria-labelledby="connection-info-title">
             <header><span className={styles.asideIcon}><CardIcon kind="receipt" /></span><h2 id="connection-info-title">Informasi Koneksi</h2></header>
