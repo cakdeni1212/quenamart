@@ -153,14 +153,19 @@ export class WahaWhatsAppProviderAdapter {
   async getPairingQr() {
     const current = await this.readSession();
     if (!current || current.connection_state !== "WAITING_QR") return { qrDataUrl: null, expiresAt: null };
-    const response = await this.request(this.sessionPath("/auth/qr?format=image"), {
+    // WAHA exposes QR under /api/{session}/auth/qr, not the session-management
+    // namespace /api/sessions/{session}.
+    const response = await this.request(`/api/${encodeURIComponent(this.sessionName)}/auth/qr`, {
       headers: { Accept: "image/png" },
     });
     if (!response.ok) return { qrDataUrl: null, expiresAt: null };
     const type = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
     if (type !== "image/png") throw new WahaProviderError("INVALID_PROVIDER_RESPONSE");
     const bytes = await readBoundedBody(response, 512_000);
-    if (bytes.length < 1 || bytes.length > 512_000) throw new WahaProviderError("INVALID_PROVIDER_RESPONSE");
+    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (bytes.length < pngSignature.length || pngSignature.some((byte, index) => bytes[index] !== byte)) {
+      throw new WahaProviderError("INVALID_PROVIDER_RESPONSE");
+    }
     return {
       qrDataUrl: `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`,
       expiresAt: null,

@@ -24,12 +24,13 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function sync() {
+  async function sync(): Promise<WhatsAppProviderStatus | null> {
     let result: Awaited<ReturnType<typeof readWhatsAppProviderStatus>>;
-    try { result = await readWhatsAppProviderStatus(); } catch { return; }
-    if (!result.ok || !result.status) return;
-    setStatus(result.status);
-    if (canControl && result.status.connection_state === "WAITING_QR") {
+    try { result = await readWhatsAppProviderStatus(); } catch { return null; }
+    if (!result.ok || !result.status) return null;
+    const nextStatus = result.status;
+    setStatus(nextStatus);
+    if (canControl && nextStatus.connection_state === "WAITING_QR") {
       const qr = await readWhatsAppPairingQr();
       setQrDataUrl(qr.qrDataUrl);
       setQrExpiresAt(qr.expiresAt);
@@ -37,20 +38,24 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
       setQrDataUrl(null);
       setQrExpiresAt(null);
     }
+    return nextStatus;
   }
 
   useEffect(() => {
+    if (status?.connection_state === "CONNECTED" && status.provider_available) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      if (active) await sync();
-      if (active) timer = setTimeout(poll, 3000);
+      const nextStatus = active ? await sync() : null;
+      if (active && !(nextStatus?.connection_state === "CONNECTED" && nextStatus.provider_available)) {
+        timer = setTimeout(poll, 3000);
+      }
     };
     timer = setTimeout(poll, 1000);
     return () => { active = false; clearTimeout(timer); };
     // Poll lifecycle state while dashboard remains open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canControl]);
+  }, [canControl, status?.connection_state, status?.provider_available]);
 
   async function command(value: "CONNECT" | "DISCONNECT" | "RECONNECT") {
     if (!canControl || busy) return;

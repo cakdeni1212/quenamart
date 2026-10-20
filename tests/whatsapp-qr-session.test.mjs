@@ -71,19 +71,28 @@ test("connect creates a missing WAHA session or starts a stopped session", async
   ]);
 });
 
-test("QR retrieval is available only in scan state and returns a temporary image URL", async () => {
+test("QR retrieval uses WAHA's session auth QR endpoint and returns a temporary image URL", async () => {
   let status = "SCAN_QR_CODE";
   const calls = [];
   const provider = adapter(async (url, init) => {
     calls.push({ url, init });
-    if (!url.includes("/auth/qr")) return jsonResponse({ status });
-    return new Response(Uint8Array.from([137, 80, 78, 71]), { headers: { "content-type": "image/png" } });
+    if (url.endsWith("/api/sessions/quena-test")) return jsonResponse({ status });
+    return new Response(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]), { headers: { "content-type": "image/png" } });
   });
   const qr = await provider.getPairingQr();
-  assert.equal(qr.qrDataUrl, "data:image/png;base64,iVBORw==");
+  assert.equal(qr.qrDataUrl, "data:image/png;base64,iVBORw0KGgo=");
   assert.equal(qr.expiresAt, null);
+  assert.equal(calls[0].url, "http://127.0.0.1:3000/api/sessions/quena-test");
+  assert.equal(calls[1].url, "http://127.0.0.1:3000/api/quena-test/auth/qr");
   assert.equal(calls[1].init.headers.Accept, "image/png");
   status = "WORKING";
+  assert.deepEqual(await provider.getPairingQr(), { qrDataUrl: null, expiresAt: null });
+});
+
+test("QR endpoint not-ready responses stay empty for polling until WAHA publishes a new QR", async () => {
+  const provider = adapter(async (url) => url.endsWith("/api/sessions/quena-test")
+    ? jsonResponse({ status: "SCAN_QR_CODE" })
+    : new Response(null, { status: 404 }));
   assert.deepEqual(await provider.getPairingQr(), { qrDataUrl: null, expiresAt: null });
 });
 
@@ -115,6 +124,7 @@ test("Server Action boundary enforces OWNER controls and OWNER-only QR; adapter 
   assert.match(actions, /profile\.role !== "OWNER"\) return \{ ok: false as const, qrDataUrl/);
   assert.match(serverBoundary, /^import "server-only";/);
   assert.match(controls, /canControl && state === "WAITING_QR"/);
+  assert.match(controls, /status\?\.connection_state === "CONNECTED" && status\.provider_available/);
   assert.doesNotMatch(actions + adapterSource, /sendMessage|sendTransactionalMessage|notification_outbox/);
 });
 
