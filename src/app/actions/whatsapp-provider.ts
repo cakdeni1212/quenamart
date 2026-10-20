@@ -20,7 +20,7 @@ export async function readWhatsAppProviderStatus() {
     const status = await getWahaWhatsAppProvider().getConnectionStatus();
     return { ok: true as const, status: { ...status, outlet_id: "", provider_key: "QR_SESSION" as const } };
   } catch {
-    return { ok: true as const, status: emptyStatus() };
+    return { ok: true as const, status: emptyStatus("ERROR") };
   }
 }
 

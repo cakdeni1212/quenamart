@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { readWhatsAppPairingQr, readWhatsAppProviderStatus, requestWhatsAppProviderCommand } from "@/app/actions/whatsapp-provider";
 import type { WhatsAppProviderStatus } from "@/lib/notifications/waha-provider.shared";
+import { shouldPollWhatsAppProvider } from "@/lib/notifications/whatsapp-runtime.shared.mjs";
+import { useWhatsAppProviderState } from "@/components/notifications/whatsapp-provider-state";
 import styles from "@/components/notifications/whatsapp-center.module.css";
 
 const labels: Record<WhatsAppProviderStatus["connection_state"], string> = {
@@ -17,8 +19,8 @@ function dateTime(value: string | null) {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 }
 
-export function WhatsAppConnectionControls({ initialStatus, canControl }: { initialStatus: WhatsAppProviderStatus | null; canControl: boolean }) {
-  const [status, setStatus] = useState(initialStatus);
+export function WhatsAppConnectionControls({ canControl }: { canControl: boolean }) {
+  const { status, setStatus } = useWhatsAppProviderState();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,12 +44,12 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
   }
 
   useEffect(() => {
-    if (status?.connection_state === "CONNECTED" && status.provider_available) return;
+    if (!shouldPollWhatsAppProvider(status?.connection_state ?? "UNKNOWN")) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       const nextStatus = active ? await sync() : null;
-      if (active && !(nextStatus?.connection_state === "CONNECTED" && nextStatus.provider_available)) {
+      if (active && shouldPollWhatsAppProvider(nextStatus?.connection_state ?? "UNKNOWN")) {
         timer = setTimeout(poll, 3000);
       }
     };
@@ -55,7 +57,7 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
     return () => { active = false; clearTimeout(timer); };
     // Poll lifecycle state while dashboard remains open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canControl, status?.connection_state, status?.provider_available]);
+  }, [canControl, status?.connection_state]);
 
   async function command(value: "CONNECT" | "DISCONNECT" | "RECONNECT") {
     if (!canControl || busy) return;
@@ -70,8 +72,8 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
     } finally { setBusy(false); }
   }
 
-  const state = status?.connection_state ?? "NOT_CONFIGURED";
-  const connected = state === "CONNECTED" && status?.provider_available;
+  const state = status?.connection_state ?? "ERROR";
+  const connected = state === "CONNECTED";
   const warning = state !== "CONNECTED";
   const cardClass = styles.connectionCard + (warning ? " " + styles.connectionWarning : " " + styles.connectionReady);
   const error = state === "ERROR" || status?.last_error_code === "WORKER_STALE";
@@ -81,8 +83,8 @@ export function WhatsAppConnectionControls({ initialStatus, canControl }: { init
     <div className={styles.connectionCopy}>
       <span className={styles.sectionEyebrow}>STATUS KONEKSI</span>
       <h2 id="connection-title">{connected ? "WhatsApp terhubung" : state === "WAITING_QR" ? "Scan QR WhatsApp" : state === "CONNECTING" ? "Menghubungkan WhatsApp..." : error ? "Koneksi WhatsApp bermasalah" : "WhatsApp belum terhubung"}</h2>
-      <p>{connected ? `WhatsApp · ${status.connected_number_masked ?? "Nomor tersamarkan"} · QR Session` : error ? "Layanan WAHA belum aktif atau koneksi perlu diperiksa. Status aman ditampilkan tanpa detail teknis." : state === "WAITING_QR" ? `QR berlaku sementara${qrExpiresAt ? ` hingga ${dateTime(qrExpiresAt)}` : ""}.` : state === "CONNECTING" ? "WAHA sedang menyambungkan perangkat." : status?.provider_available ? "WAHA siap menerima permintaan koneksi." : "Layanan WAHA belum aktif atau konfigurasi server belum lengkap."}</p>
-      {connected && status.last_connected_at && <p>Terakhir terhubung: {dateTime(status.last_connected_at)}</p>}
+      <p>{connected ? `WhatsApp · ${status?.connected_number_masked ?? "Nomor tersamarkan"} · QR Session` : error ? "Layanan WAHA belum aktif atau koneksi perlu diperiksa. Status aman ditampilkan tanpa detail teknis." : state === "WAITING_QR" ? `QR berlaku sementara${qrExpiresAt ? ` hingga ${dateTime(qrExpiresAt)}` : ""}.` : state === "CONNECTING" ? "WAHA sedang menyambungkan perangkat." : status?.provider_available ? "WAHA siap menerima permintaan koneksi." : "Layanan WAHA belum aktif atau konfigurasi server belum lengkap."}</p>
+      {connected && status?.last_connected_at && <p>Terakhir terhubung: {dateTime(status.last_connected_at)}</p>}
       {notice && <p role="status">{notice}</p>}
       {canControl && state === "WAITING_QR" && <div className={styles.qrPanel}>
         {qrDataUrl ? <Image unoptimized src={qrDataUrl} alt="QR sementara untuk menghubungkan WhatsApp Quena" width={260} height={260} /> : <div className={styles.qrPlaceholder}>Menyiapkan QR aman…</div>}

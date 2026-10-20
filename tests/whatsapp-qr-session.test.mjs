@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { WahaProviderError, WahaWhatsAppProviderAdapter } from "../services/whatsapp-waha/adapter.mjs";
+import { getWhatsAppDeliveryReadiness, shouldPollWhatsAppProvider, whatsappDeliveryReadinessHint, whatsappDeliveryReadinessLabel } from "../src/lib/notifications/whatsapp-runtime.shared.mjs";
 
 const actions = await readFile(new URL("../src/app/actions/whatsapp-provider.ts", import.meta.url), "utf8");
 const adapterSource = await readFile(new URL("../services/whatsapp-waha/adapter.mjs", import.meta.url), "utf8");
 const serverBoundary = await readFile(new URL("../src/lib/notifications/waha-provider.server.ts", import.meta.url), "utf8");
 const controls = await readFile(new URL("../src/components/notifications/whatsapp-connection-controls.tsx", import.meta.url), "utf8");
+const providerState = await readFile(new URL("../src/components/notifications/whatsapp-provider-state.tsx", import.meta.url), "utf8");
+const centerPage = await readFile(new URL("../app/(workspace)/whatsapp/page.tsx", import.meta.url), "utf8");
+const centerControls = await readFile(new URL("../src/components/notifications/whatsapp-center-controls.tsx", import.meta.url), "utf8");
 const compose = await readFile(new URL("../infra/waha/compose.yaml", import.meta.url), "utf8");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const packageLock = await readFile(new URL("../package-lock.json", import.meta.url), "utf8");
@@ -31,6 +35,57 @@ test("WAHA session lifecycle states map to Quena provider states with masked ide
     assert.equal(status.provider_available, true);
     assert.equal(status.connected_number_masked, quena === "CONNECTED" ? "62••••••7890" : null);
     assert.equal(status.last_connected_at, null);
+  }
+});
+
+test("WORKING session identity is masked and is the source of connected display", async () => {
+  const status = await adapter(async () => jsonResponse({ status: "WORKING", me: { id: "6281234562601@c.us" } })).getConnectionStatus();
+  assert.equal(status.connection_state, "CONNECTED");
+  assert.equal(status.connected_number_masked, "62••••••2601");
+  assert.match(controls, /WhatsApp · \$\{status\?\.connected_number_masked/);
+  assert.match(providerState, /const connectionState = status\?\.connection_state \?\? "ERROR"/);
+  assert.match(controls, /const state = status\?\.connection_state \?\? "ERROR"/);
+});
+
+test("connected provider with missing public URL keeps saved automation distinct and not ready", () => {
+  const readiness = getWhatsAppDeliveryReadiness({
+    transactionsEnabled: true, automaticReceiptEnabled: true, connectionState: "CONNECTED", publicUrlReady: false,
+  });
+  assert.equal(readiness, "WAITING_PUBLIC_URL");
+  assert.equal(whatsappDeliveryReadinessLabel(readiness), "Menunggu URL publik");
+  assert.match(whatsappDeliveryReadinessHint(readiness), /Preferensi tersimpan aktif.*URL publik HTTPS/);
+  assert.match(centerControls, /checked=\{form\.automatic_receipt_enabled\}/);
+  assert.match(centerControls, /whatsappDeliveryReadinessHint\(readiness\)/);
+  assert.match(centerPage, /<WhatsAppProviderState key=.*initialStatus=\{providerStatus\}/);
+  assert.match(centerPage, /<WhatsAppConnectionInfo/);
+});
+
+test("all connection UI projections share one live normalized provider state", () => {
+  assert.match(controls, /const \{ status, setStatus \} = useWhatsAppProviderState\(\)/);
+  assert.match(providerState, /createContext<ProviderStateContextValue/);
+  assert.match(providerState, /const \{ status \} = useWhatsAppProviderState\(\)/);
+  assert.doesNotMatch(centerPage, /summary\?\.provider_state/);
+  assert.match(centerPage, /<WhatsAppProviderState key=.*initialStatus=\{providerStatus\}/);
+});
+
+test("polling continues until connected and stops immediately afterward", () => {
+  for (const state of ["NOT_CONFIGURED", "WAITING_QR", "CONNECTING", "DISCONNECTED", "ERROR", "UNKNOWN"]) {
+    assert.equal(shouldPollWhatsAppProvider(state), true, state);
+  }
+  assert.equal(shouldPollWhatsAppProvider("CONNECTED"), false);
+  assert.match(controls, /shouldPollWhatsAppProvider\(nextStatus\?\.connection_state \?\? "UNKNOWN"\)/);
+});
+
+test("QR endpoint is not queried while session is starting or already connected", async () => {
+  for (const sessionState of ["STARTING", "WORKING"]) {
+    const calls = [];
+    const provider = adapter(async (url) => {
+      calls.push(url);
+      return jsonResponse({ status: sessionState });
+    });
+    assert.deepEqual(await provider.getPairingQr(), { qrDataUrl: null, expiresAt: null });
+    assert.equal(calls.length, 1);
+    assert.match(calls[0], /\/api\/sessions\/quena-test$/);
   }
 });
 
@@ -124,7 +179,7 @@ test("Server Action boundary enforces OWNER controls and OWNER-only QR; adapter 
   assert.match(actions, /profile\.role !== "OWNER"\) return \{ ok: false as const, qrDataUrl/);
   assert.match(serverBoundary, /^import "server-only";/);
   assert.match(controls, /canControl && state === "WAITING_QR"/);
-  assert.match(controls, /status\?\.connection_state === "CONNECTED" && status\.provider_available/);
+  assert.match(controls, /shouldPollWhatsAppProvider/);
   assert.doesNotMatch(actions + adapterSource, /sendMessage|sendTransactionalMessage|notification_outbox/);
 });
 

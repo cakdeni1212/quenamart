@@ -4,11 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateWhatsAppSettings, type WhatsAppSettingsInput } from "@/app/actions/whatsapp-settings";
 import { QuenaSwitch } from "@/components/ui/quena-switch";
+import { getWhatsAppDeliveryReadiness, whatsappDeliveryReadinessHint } from "@/lib/notifications/whatsapp-runtime.shared.mjs";
+import { useWhatsAppProviderState } from "@/components/notifications/whatsapp-provider-state";
 import styles from "./whatsapp-center.module.css";
 
 type WhatsAppSettingsData = WhatsAppSettingsInput & {
   outlet_id: string;
-  provider_state: string;
   public_url_ready: boolean;
   updated_at: string | null;
 };
@@ -23,14 +24,22 @@ function values(settings: WhatsAppSettingsData): WhatsAppSettingsInput {
   };
 }
 
-export function WhatsAppCenterControls({ settings, canEdit, effectiveProviderState }: { settings: WhatsAppSettingsData; canEdit: boolean; effectiveProviderState: string }) {
+export function WhatsAppCenterControls({ settings, canEdit, publicUrlReady }: { settings: WhatsAppSettingsData; canEdit: boolean; publicUrlReady: boolean }) {
+  const { status } = useWhatsAppProviderState();
   const router = useRouter();
   const [initial, setInitial] = useState(() => values(settings));
   const [form, setForm] = useState(() => values(settings));
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const dirty = JSON.stringify(initial) !== JSON.stringify(form);
-  const providerReady = effectiveProviderState === "CONNECTED" && settings.public_url_ready;
+  const connectionState = status?.connection_state ?? "ERROR";
+  const providerReady = connectionState === "CONNECTED" && publicUrlReady;
+  const readiness = getWhatsAppDeliveryReadiness({
+    transactionsEnabled: form.whatsapp_transactions_enabled,
+    automaticReceiptEnabled: form.automatic_receipt_enabled,
+    connectionState,
+    publicUrlReady,
+  });
 
   function update(key: keyof WhatsAppSettingsInput, checked: boolean) {
     setForm((current) => {
@@ -68,7 +77,7 @@ export function WhatsAppCenterControls({ settings, canEdit, effectiveProviderSta
       <section className={styles.quickGroup} aria-label="Pengaturan WhatsApp transaksi">
         <QuickSetting
           title="WhatsApp Transaksi"
-          description="Mengizinkan notifikasi layanan transaksi diproses setelah koneksi tersedia."
+          description="Preferensi transaksi tersimpan; kesiapan pengiriman ditampilkan terpisah."
           label="WhatsApp Transaksi"
           checked={form.whatsapp_transactions_enabled}
           disabled={!canEdit || saving}
@@ -76,13 +85,13 @@ export function WhatsAppCenterControls({ settings, canEdit, effectiveProviderSta
         />
         <QuickSetting
           title="Kirim struk otomatis"
-          description="Struk otomatis berjalan saat provider terhubung dan URL publik siap."
+          description="Preferensi tersimpan. Pengiriman pesan masih dinonaktifkan pada tahap konektivitas ini."
           label="Kirim struk otomatis"
           checked={form.automatic_receipt_enabled}
           disabled={!canEdit || saving || (!form.automatic_receipt_enabled && (!form.whatsapp_transactions_enabled || !providerReady))}
           onChange={(checked) => update("automatic_receipt_enabled", checked)}
         />
-        {!providerReady && <p className={styles.prerequisiteHint}>Otomatisasi belum dapat diaktifkan sebelum provider terhubung dan URL publik siap.</p>}
+        <p className={styles.prerequisiteHint}>{whatsappDeliveryReadinessHint(readiness)}</p>
       </section>
 
       <div className={styles.sidebarDivider} />

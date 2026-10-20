@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/auth/session";
 import { readWhatsAppSettings, readWhatsAppSummary } from "@/lib/notifications/whatsapp.server";
 import { readWhatsAppProviderStatus } from "@/app/actions/whatsapp-provider";
 import { WhatsAppConnectionControls } from "@/components/notifications/whatsapp-connection-controls";
+import { WhatsAppConnectionInfo, WhatsAppProviderState } from "@/components/notifications/whatsapp-provider-state";
 import { RefreshButton, WhatsAppCenterControls } from "@/components/notifications/whatsapp-center-controls";
 import styles from "@/components/notifications/whatsapp-center.module.css";
 
@@ -65,11 +66,7 @@ export default async function WhatsAppCenterPage() {
   const summary = summaryResult.summary;
   const settings = settingsResult.settings;
   const providerStatus = providerResult.ok ? providerResult.status : null;
-  const providerState = providerStatus?.connection_state ?? summary?.provider_state ?? "NOT_CONFIGURED";
   const publicUrlReady = publicHttpsConfigured() && settings?.public_url_ready === true;
-  const automationReady = summary?.automation_enabled === true
-    && providerState === "CONNECTED"
-    && publicUrlReady;
 
   return (
     <main className="page-content">
@@ -81,9 +78,10 @@ export default async function WhatsAppCenterPage() {
         </div>
       </header>
 
+      <WhatsAppProviderState key={`${providerStatus?.connection_state ?? "UNKNOWN"}:${providerStatus?.connected_number_masked ?? ""}`} initialStatus={providerStatus}>
       <div className={styles.dashboardGrid}>
         <main className={styles.dashboardMain}>
-          <WhatsAppConnectionControls initialStatus={providerStatus} canControl={profile.role === "OWNER"} />
+          <WhatsAppConnectionControls canControl={profile.role === "OWNER"} />
 
           {summary ? <section className={styles.metricGrid} aria-label="Ringkasan pengiriman">
             <MetricCard kind="sent" label="Terkirim hari ini" value={summary.today_sent.toLocaleString("id-ID")} note={summary.today_sent ? "Pesan selesai hari ini" : "Tidak ada perubahan"} />
@@ -114,18 +112,12 @@ export default async function WhatsAppCenterPage() {
         </main>
 
         <aside className={styles.dashboardSidebar}>
-          {settings ? <WhatsAppCenterControls key={[settings.outlet_id, settings.updated_at ?? "", settings.whatsapp_transactions_enabled, settings.automatic_receipt_enabled, settings.include_points_earned, settings.include_points_redeemed, settings.include_points_balance, providerState, settings.public_url_ready].join(":")} settings={settings} canEdit={profile.role === "OWNER"} effectiveProviderState={providerState} /> : <section className={styles.quickCard} role="alert"><h2>Pengaturan Cepat</h2><p>{settingsResult.error}</p><Link href="/pengaturan/whatsapp" className={styles.secondaryLink}>Buka Pengaturan Lengkap</Link></section>}
+          {settings ? <WhatsAppCenterControls key={[settings.outlet_id, settings.updated_at ?? "", settings.whatsapp_transactions_enabled, settings.automatic_receipt_enabled, settings.include_points_earned, settings.include_points_redeemed, settings.include_points_balance].join(":")} settings={settings} canEdit={profile.role === "OWNER"} publicUrlReady={publicUrlReady} /> : <section className={styles.quickCard} role="alert"><h2>Pengaturan Cepat</h2><p>{settingsResult.error}</p><Link href="/pengaturan/whatsapp" className={styles.secondaryLink}>Buka Pengaturan Lengkap</Link></section>}
 
-          <section className={styles.connectionInfo} aria-labelledby="connection-info-title">
-            <header><span className={styles.asideIcon}><CardIcon kind="receipt" /></span><h2 id="connection-info-title">Informasi Koneksi</h2></header>
-            <InfoRow label="Provider" value={providerState === "NOT_CONFIGURED" ? "Belum dikonfigurasi" : "QR Session"} />
-            <InfoRow label="Status" value={providerState} code />
-            <InfoRow label="URL publik" value={settings ? publicUrlReady ? "Siap" : "Belum dikonfigurasi" : "Belum tersedia"} />
-            <InfoRow label="Otomatisasi" value={summary ? automationReady ? "Aktif" : summary.automation_enabled ? "Menunggu kesiapan" : "Nonaktif" : "Belum tersedia"} />
-            <Link href="/pengaturan/whatsapp" className={styles.settingsLink}><CardIcon kind="settings" />Buka Pengaturan Lengkap</Link>
-          </section>
+          <WhatsAppConnectionInfo publicUrlReady={publicUrlReady} transactionsEnabled={settings?.whatsapp_transactions_enabled === true} automaticReceiptEnabled={settings?.automatic_receipt_enabled === true} />
         </aside>
       </div>
+      </WhatsAppProviderState>
     </main>
   );
 }
@@ -138,8 +130,4 @@ function MetricCard({ kind, label, value, note, compact = false }: { kind: "sent
     <strong className={compact ? styles.metricCompact : ""}>{value}</strong>
     <small>{note}</small>
   </article>;
-}
-
-function InfoRow({ label, value, code = false }: { label: string; value: string; code?: boolean }) {
-  return <div className={styles.infoRow}><span>{label}</span><strong className={code ? styles.codeValue : ""}>{value}</strong></div>;
 }
