@@ -68,11 +68,13 @@ test("all connection UI projections share one live normalized provider state", (
   assert.match(centerPage, /<WhatsAppProviderState key=.*initialStatus=\{providerStatus\}/);
 });
 
-test("polling continues until connected and stops immediately afterward", () => {
-  for (const state of ["NOT_CONFIGURED", "WAITING_QR", "CONNECTING", "DISCONNECTED", "ERROR", "UNKNOWN"]) {
+test("polling follows active lifecycle states and stops when connected or unavailable", () => {
+  for (const state of ["WAITING_QR", "CONNECTING", "DISCONNECTED"]) {
     assert.equal(shouldPollWhatsAppProvider(state), true, state);
   }
-  assert.equal(shouldPollWhatsAppProvider("CONNECTED"), false);
+  for (const state of ["CONNECTED", "NOT_CONFIGURED", "ERROR", "UNKNOWN"]) {
+    assert.equal(shouldPollWhatsAppProvider(state), false, state);
+  }
   assert.match(controls, /shouldPollWhatsAppProvider\(nextStatus\?\.connection_state \?\? "UNKNOWN"\)/);
 });
 
@@ -177,6 +179,7 @@ test("Server Action boundary enforces OWNER controls and OWNER-only QR; adapter 
   assert.match(actions, /profile\.role !== "OWNER"/);
   assert.match(actions, /!\["OWNER", "ADMIN"\]\.includes\(profile\.role\)/);
   assert.match(actions, /profile\.role !== "OWNER"\) return \{ ok: false as const, qrDataUrl/);
+  assert.match(actions, /code === "PROVIDER_NOT_CONFIGURED" \? "NOT_CONFIGURED" : "ERROR"/);
   assert.match(serverBoundary, /^import "server-only";/);
   assert.match(controls, /canControl && state === "WAITING_QR"/);
   assert.match(controls, /shouldPollWhatsAppProvider/);

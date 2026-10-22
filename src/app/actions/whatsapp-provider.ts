@@ -10,7 +10,8 @@ function emptyStatus(state: WhatsAppProviderStatus["connection_state"] = "NOT_CO
   return {
     outlet_id: "", provider_key: "QR_SESSION", connection_state: state,
     connected_number_masked: null, last_connected_at: null, last_disconnected_at: null,
-    last_error_code: null, provider_available: false, qr_expires_at: null,
+    last_error_code: state === "NOT_CONFIGURED" ? "PROVIDER_NOT_CONFIGURED" : "UNKNOWN_PROVIDER_ERROR",
+    provider_available: false, qr_expires_at: null,
   };
 }
 
@@ -20,8 +21,9 @@ export async function readWhatsAppProviderStatus() {
   try {
     const status = await getWahaWhatsAppProvider().getConnectionStatus();
     return { ok: true as const, status: { ...status, outlet_id: "", provider_key: "QR_SESSION" as const } };
-  } catch {
-    return { ok: true as const, status: emptyStatus("ERROR") };
+  } catch (error) {
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    return { ok: true as const, status: emptyStatus(code === "PROVIDER_NOT_CONFIGURED" ? "NOT_CONFIGURED" : "ERROR") };
   }
 }
 

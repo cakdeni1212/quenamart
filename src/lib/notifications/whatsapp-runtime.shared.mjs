@@ -25,5 +25,5 @@ export function whatsappDeliveryReadinessHint(value) {
 }
 
 export function shouldPollWhatsAppProvider(state) {
-  return state !== "CONNECTED";
+  return ["DISCONNECTED", "WAITING_QR", "CONNECTING"].includes(state);
 }
