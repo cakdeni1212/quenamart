@@ -12,6 +12,7 @@ export class WahaProviderError extends Error { code: string; }
 export class WahaWhatsAppProviderAdapter {
   constructor(options: { baseUrl?: string; apiKey?: string; sessionName?: string; fetcher?: typeof fetch; timeoutMs?: number });
   getConnectionStatus(): Promise<WahaStatus>;
+  sendManualTestMessage(chatId: string, text: string): Promise<{ ok: true }>;
   requestPairing(): Promise<void>;
   getPairingQr(): Promise<{ qrDataUrl: string | null; expiresAt: string | null }>;
   disconnect(): Promise<void>;

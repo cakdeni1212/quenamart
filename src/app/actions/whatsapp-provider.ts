@@ -4,6 +4,7 @@ import { getProfile } from "@/lib/auth/session";
 import { getWahaWhatsAppProvider } from "@/lib/notifications/waha-provider.server";
 import { createClient } from "@/lib/supabase/server";
 import type { WhatsAppProviderStatus } from "@/lib/notifications/waha-provider.shared";
+import { sendManualWhatsAppTest } from "../../../services/whatsapp-waha/manual-test.mjs";
 
 function emptyStatus(state: WhatsAppProviderStatus["connection_state"] = "NOT_CONFIGURED"): WhatsAppProviderStatus {
   return {
@@ -56,4 +57,18 @@ export async function readWhatsAppPairingQr() {
   } catch {
     return { ok: true as const, qrDataUrl: null, expiresAt: null };
   }
+}
+
+export async function sendManualWhatsAppTestMessage(destination: string, message: string) {
+  const profile = await getProfile();
+  if (!profile || profile.role !== "OWNER") {
+    return { ok: false as const, message: "Hanya Owner yang dapat mengirim pesan tes WhatsApp." };
+  }
+  return sendManualWhatsAppTest({
+    role: profile.role,
+    actorId: profile.id,
+    destination,
+    message,
+    provider: getWahaWhatsAppProvider,
+  });
 }

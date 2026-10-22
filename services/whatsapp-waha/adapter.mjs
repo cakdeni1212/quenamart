@@ -70,7 +70,7 @@ async function readBoundedBody(response, limit) {
   return bytes;
 }
 
-/** Server-side WAHA REST adapter. It intentionally has no message-sending method. */
+/** Server-side WAHA REST adapter. Customer/outbox delivery is intentionally not wired here. */
 export class WahaWhatsAppProviderAdapter {
   constructor({ baseUrl, apiKey, sessionName, fetcher = globalThis.fetch, timeoutMs = 8000 }) {
     this.baseUrl = normalizeBaseUrl(baseUrl ?? "");
@@ -131,6 +131,30 @@ export class WahaWhatsAppProviderAdapter {
         last_error_code: code, provider_available: false, qr_expires_at: null,
       };
     }
+  }
+
+  /** Sends one explicitly requested diagnostic text; never used by the outbox. */
+  async sendManualTestMessage(chatId, text) {
+    const current = await this.readSession();
+    if (!current || current.connection_state !== "CONNECTED") {
+      throw new WahaProviderError("PROVIDER_NOT_CONNECTED");
+    }
+    const response = await this.request("/api/sendText", {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: JSON.stringify({ session: this.sessionName, chatId, text }),
+    });
+    if (!response.ok) {
+      const code = response.status === 401 || response.status === 403
+        ? "PROVIDER_AUTH_FAILED"
+        : response.status === 400 || response.status === 422
+          ? "INVALID_MESSAGE_REQUEST"
+          : response.status === 429
+            ? "PROVIDER_RATE_LIMITED"
+            : "PROVIDER_UNAVAILABLE";
+      throw new WahaProviderError(code);
+    }
+    return { ok: true };
   }
 
   async requestPairing() {
