@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
+    // Hostinger shared hosting can report host CPU count rather than its quota.
+    // Keep build-time worker/process and static-render concurrency bounded.
+    cpus: 2,
+    staticGenerationMaxConcurrency: 2,
     serverActions: {
       // The app accepts files up to 25 MiB; leave room for multipart framing.
       bodySizeLimit: "26mb",
