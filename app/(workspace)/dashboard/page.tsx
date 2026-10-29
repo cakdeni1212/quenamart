@@ -31,8 +31,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return <main className={`page-content ${styles.page}`}>
     <header className={styles.heading}>
-      <div><div className="eyebrow">RUANG KERJA OWNER</div><h1>Dashboard</h1><p>Kondisi toko hari ini, dalam satu pandangan.</p></div>
-      {data && <time className={styles.datePill} dateTime={data.business_date}>{new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeZone: "Asia/Jakarta" }).format(new Date(`${data.business_date}T12:00:00Z`))}</time>}
+      <div className={styles.titleBlock}>
+        <h1>Dashboard</h1>
+        {data && <time className={styles.datePill} dateTime={data.business_date}>{new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeZone: "Asia/Jakarta" }).format(new Date(`${data.business_date}T12:00:00Z`))}</time>}
+      </div>
     </header>
 
     {result.error ? <section className={styles.error} role="alert"><strong>Ringkasan toko belum tersedia</strong><p>{result.error}</p><Link href="/dashboard">Coba lagi</Link></section> : data && <>

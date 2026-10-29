@@ -7,6 +7,7 @@ import type { UserRole } from "@/lib/auth/roles";
 import { canAccessSection, type AppSection } from "@/lib/auth/roles";
 import { logout } from "@/app/actions/auth";
 import { sidebarTreeForPath, type SidebarTreeId } from "@/lib/navigation/sidebar-tree";
+import styles from "@/components/app/workspace-frame.module.css";
 
 const navigation: { label: string; href: string; section: AppSection; icon: string }[] = [
   { label: "Dashboard", href: "/dashboard", section: "dashboard", icon: "⌂" },
@@ -55,7 +56,17 @@ function SidebarTreeGroup({
   </div>;
 }
 
-export function Sidebar({ role, name }: { role: UserRole; name: string | null }) {
+export function Sidebar({
+  role,
+  name,
+  drawerOpen = false,
+  onClose,
+}: {
+  role: UserRole;
+  name: string | null;
+  drawerOpen?: boolean;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
   const routeTree = sidebarTreeForPath(pathname);
 
@@ -67,8 +78,18 @@ export function Sidebar({ role, name }: { role: UserRole; name: string | null })
   ].filter((link) => link.visible);
 
   return (
-    <aside className="sidebar">
+    <aside
+      id="workspace-sidebar"
+      className={`sidebar ${styles.mobileSidebar}${drawerOpen ? ` ${styles.drawerOpen}` : ""}`}
+      aria-label="Navigasi utama"
+      onClickCapture={(event) => {
+        if (event.target instanceof Element && event.target.closest("a")) onClose?.();
+      }}
+    >
       <Link href="/dashboard" className="brand"><span className="brand-mark">Q</span><span>quena<span className="brand-light">mart</span><small>RETAIL MANAGEMENT</small></span></Link>
+      <button type="button" className={styles.drawerClose} aria-label="Tutup menu navigasi" onClick={onClose}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+      </button>
       <div className="nav-label">MENU UTAMA</div>
       <nav className="nav-list" aria-label="Menu utama">
         {navigation.filter((item) => canAccessSection(role, item.section)).map((item) => {
