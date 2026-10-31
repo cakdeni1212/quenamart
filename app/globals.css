@@ -336,3 +336,28 @@
 .pos-loyalty-discount{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;color:#61745c;font-size:10px}
 .pos-loyalty-discount strong{margin-left:auto;color:#456341}
 .pos-payment-total small{display:block;margin-top:4px;color:#879184;font-size:9px}
+
+/* Shared Quena UI rhythm tokens. Module styles may specialize layout, but should
+   use these values for common controls, cards, borders and focus treatment. */
+:root{--ui-surface:#fff;--ui-border:#e5eae2;--ui-control-height:40px;--ui-button-height:40px;--ui-radius-control:8px;--ui-radius-card:12px;--ui-focus:#c8d8bf;--ui-space-section:20px;--ui-shadow-card:0 2px 6px #24382405}
+.page-heading{gap:16px;margin-bottom:var(--ui-space-section)}
+.surface-card{border-color:var(--ui-border);border-radius:var(--ui-radius-card);background:var(--ui-surface);box-shadow:var(--ui-shadow-card)}
+.field-input{height:var(--ui-control-height);border-color:var(--ui-border);border-radius:var(--ui-radius-control)}
+.field-input:focus-visible{outline:2px solid var(--ui-focus);outline-offset:1px}
+.primary-button{min-height:var(--ui-button-height);height:auto;border-radius:var(--ui-radius-control);padding:0 14px;font-weight:650}
+.primary-button:focus-visible{outline-color:var(--ui-focus)}
+
+/* Purchasing screens share the same control, card, table and status rhythm. */
+.purchasing-page .purchase-primary,.purchasing-page .purchase-secondary,.purchasing-page .purchase-filter-submit,.purchasing-page .purchase-search-row button,.purchasing-page .purchase-product-search button,.purchasing-page .purchase-retry{display:inline-flex;min-height:var(--ui-button-height);align-items:center;justify-content:center;gap:8px;border-radius:var(--ui-radius-control);font-size:11px;font-weight:650;line-height:1.2;transition:background-color .15s,border-color .15s,color .15s}
+.purchasing-page .purchase-primary{padding-inline:14px}
+.purchasing-page .purchase-secondary,.purchasing-page .purchase-search-row button,.purchasing-page .purchase-product-search button,.purchasing-page .purchase-retry{border-color:var(--ui-border);padding-inline:14px}
+.purchasing-page .purchase-primary:focus-visible,.purchasing-page .purchase-secondary:focus-visible,.purchasing-page .purchase-filter-submit:focus-visible,.purchasing-page .purchase-search-row button:focus-visible,.purchasing-page .purchase-product-search button:focus-visible,.purchasing-page .purchase-retry:focus-visible{outline:3px solid var(--ui-focus);outline-offset:2px}
+.purchasing-page .purchase-receipt-filters input,.purchasing-page .purchase-receipt-filters select,.purchasing-page .purchase-supplier-form input,.purchasing-page .purchase-create-form input,.purchasing-page .purchase-create-form select,.purchasing-page .purchase-create-form textarea,.purchasing-page .purchase-fields input,.purchasing-page .purchase-search-row input,.purchasing-page .purchase-quantity-grid input,.purchasing-page .purchase-item-note input{border-radius:var(--ui-radius-control)}
+.purchasing-page .purchase-receipt-table-wrap,.purchasing-page .purchase-supplier-table-wrap{border-color:var(--ui-border);border-radius:var(--ui-radius-card)}
+.purchasing-page .purchase-receipt-table th,.purchasing-page .purchase-supplier-table th,.purchasing-page .purchase-review-table th,.purchasing-page .purchase-posted-table th{height:38px;background:#f7f9f6;padding:9px 11px;font-size:9px;letter-spacing:.04em}
+.purchasing-page .purchase-receipt-table td,.purchasing-page .purchase-supplier-table td,.purchasing-page .purchase-review-table td,.purchasing-page .purchase-posted-table td{padding:12px 11px;font-size:10px}
+.purchasing-page .purchase-status{min-height:24px;border:1px solid transparent;padding:3px 9px;font-size:9px}
+/* Baseline for ordinary form controls; component-specific layouts retain their
+   own sizing while inheriting the same palette, border and focus language. */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),select,textarea){border-color:var(--ui-border);border-radius:var(--ui-radius-control);color:var(--ink)}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),select,textarea):focus-visible{outline:2px solid var(--ui-focus);outline-offset:1px}

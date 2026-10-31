@@ -1,0 +1,2 @@
+.badge{display:inline-flex;min-height:24px;align-items:center;justify-content:center;border:1px solid transparent;border-radius:999px;padding:3px 9px;font-size:9px;font-weight:650;line-height:1.2;white-space:nowrap}
+.success{border-color:#dcead6;background:#edf5e9;color:#4b7344}.warning{border-color:#f0e2bf;background:#fff6e6;color:#927035}.danger{border-color:#f0d8d2;background:#fff1ed;color:#984f42}.neutral{border-color:#e4e9e2;background:#f4f6f2;color:#687568}.info{border-color:#dce7ea;background:#eff5f6;color:#5e7d84}

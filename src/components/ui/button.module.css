@@ -1,0 +1,10 @@
+.primary,.secondary,.outline,.destructive,.ghost,.icon{display:inline-flex;min-height:var(--ui-button-height,40px);align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:var(--ui-radius-control,8px);padding:0 14px;font:inherit;font-size:11px;font-weight:650;line-height:1.2;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s,transform .1s}
+.primary{border-color:#316447;background:#316447;color:#fff}.primary:hover{border-color:#25492f;background:#25492f}
+.secondary{border-color:#d5e2d1;background:#f2f7ef;color:#426743}.secondary:hover{border-color:#c1d5ba;background:#eaf3e6}
+.outline{border-color:#dfe5dc;background:#fff;color:#48584a}.outline:hover{border-color:#cbd8c6;background:#f8faf6}
+.destructive{border-color:#ecd4ce;background:#fff6f3;color:#984f42}.destructive:hover{border-color:#e3bdb3;background:#fff0eb}
+.ghost{border-color:transparent;background:transparent;padding-inline:10px;color:#426743}.ghost:hover{background:#f2f7ef}
+.icon{width:var(--ui-button-height,40px);min-width:var(--ui-button-height,40px);padding:0;border-color:#dfe5dc;background:#fff;color:#48584a}.icon:hover{background:#f4f7f1}
+.primary:focus-visible,.secondary:focus-visible,.outline:focus-visible,.destructive:focus-visible,.ghost:focus-visible,.icon:focus-visible{outline:3px solid var(--ui-focus,#c8d8bf);outline-offset:2px}
+.primary:disabled,.secondary:disabled,.outline:disabled,.destructive:disabled,.ghost:disabled,.icon:disabled{opacity:.62;cursor:not-allowed}
+.primary:active,.secondary:active,.outline:active,.destructive:active,.ghost:active,.icon:active{transform:translateY(1px)}
